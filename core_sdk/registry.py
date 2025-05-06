@@ -80,8 +80,7 @@ class ModelRegistry:
         :param model_name: Уникальное имя для регистрации модели (например, "User", "Product").
         :param model_cls: Класс SQLModel, представляющий таблицу/модель данных.
         :param access_config: Конфигурация доступа ('local' или экземпляр RemoteConfig).
-        :param manager_cls: Класс DataAccessManager, который будет использоваться для этой модели.
-                            Если access_config='local' и manager_cls=None, будет использован BaseDataAccessManager.
+        :param manager_cls: Класс DataAccessManager, который будет использоваться для этой модели. Если access_config='local' и manager_cls=None, будет использован BaseDataAccessManager.
         :param filter_cls: Опциональный класс фильтра FastAPI-Filter для этой модели.
         :param create_schema_cls: Опциональная Pydantic схема для операций создания.
         :param update_schema_cls: Опциональная Pydantic схема для операций обновления.

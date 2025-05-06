@@ -13,7 +13,7 @@
 
 1.  **Клонируйте репозиторий:**
     ```bash
-    git clone https://github.com/your_username/lowcoderetail.git # TODO: Замените URL
+    git clone https://github.com/zamb124/lowcoderetail.git # TODO: Замените URL
     cd lowcoderetail
     ```
 
