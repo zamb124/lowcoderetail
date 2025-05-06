@@ -1,19 +1,19 @@
 # core/app/schemas/group.py
 import logging
 import uuid
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List # Убираем TYPE_CHECKING, если импорт прямой
 
 from sqlmodel import SQLModel, Field
 
 # Абсолютный импорт схемы пользователя из SDK
 from core_sdk.schemas.user import UserRead
 
-# Относительный импорт схемы права доступа из текущего приложения
-# Используем TYPE_CHECKING для избежания циклического импорта, если PermissionRead импортирует GroupRead
-if TYPE_CHECKING:
-    from .permission import PermissionRead
+# --- ИСПРАВЛЕНИЕ: Прямой импорт PermissionRead ---
+# Импортируем класс напрямую, чтобы он был доступен во время выполнения model_rebuild()
+from .permission import PermissionRead
+# -------------------------------------------------
 
-logger = logging.getLogger("app.schemas.group") # Логгер для этого модуля
+logger = logging.getLogger("app.schemas.group")
 
 # Базовая схема для общих полей группы
 class GroupBase(SQLModel):
@@ -31,7 +31,7 @@ class GroupBase(SQLModel):
 # Схема для создания новой группы
 class GroupCreate(GroupBase):
     """Схема для создания новой группы."""
-    pass # Наследует все поля из GroupBase
+    pass
 
 # Схема для обновления существующей группы
 class GroupUpdate(SQLModel):
@@ -56,16 +56,18 @@ class GroupRead(GroupBase):
 # Схема для чтения данных группы со связанными пользователями и правами
 class GroupReadWithDetails(GroupRead):
     """Схема для чтения группы с детальной информацией о пользователях и правах."""
-    # Используем UserRead из SDK
     users: List[UserRead] = Field(
         default=[],
         description="Список пользователей, входящих в эту группу."
     )
-    # Используем PermissionRead из локальных схем
-    permissions: List["PermissionRead"] = Field(
+    # --- ИСПРАВЛЕНИЕ: Можно убрать кавычки, если нет цикла импорта ---
+    # Если есть цикл импорта (permission.py импортирует group.py),
+    # то кавычки нужно оставить: List["PermissionRead"]
+    # Но прямой импорт выше все равно необходим для model_rebuild.
+    permissions: List[PermissionRead] = Field(
         default=[],
         description="Список прав доступа, назначенных этой группе."
     )
+    # -------------------------------------------------------------
 
-# Логгируем факт определения схем (пример использования логгера в файле схем)
 logger.debug("Group schemas defined: GroupBase, GroupCreate, GroupUpdate, GroupRead, GroupReadWithDetails")

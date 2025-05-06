@@ -1,22 +1,22 @@
 # core/app/schemas/user.py
 import logging
 import uuid
-from typing import Optional, List
+from typing import Optional, List # Убираем TYPE_CHECKING
 
-from pydantic import EmailStr # EmailStr используется для валидации email
+from pydantic import EmailStr
 from sqlmodel import SQLModel, Field
 
-# Относительный импорт схемы группы из текущего приложения
+# --- ИСПРАВЛЕНИЕ: Прямой импорт GroupRead ---
 from .group import GroupRead
-# CompanyRead не используется в этих схемах, убран импорт
+# -------------------------------------------
 
-logger = logging.getLogger("app.schemas.user") # Логгер для этого модуля
+logger = logging.getLogger("app.schemas.user")
 
 # Базовая схема с общими полями пользователя
 class UserBase(SQLModel):
     email: EmailStr = Field(
-        index=True, # Хотя index здесь больше для модели, оставляем для информации
-        unique=True, # Аналогично
+        index=True,
+        unique=True,
         description="Email адрес пользователя (уникальный)."
     )
     first_name: Optional[str] = Field(
@@ -72,25 +72,25 @@ class UserUpdate(SQLModel):
         default=None,
         description="Новый пароль пользователя (если требуется изменить)."
     )
-    company_id: Optional[uuid.UUID] = Field( # Добавлено поле для возможности смены компании
+    company_id: Optional[uuid.UUID] = Field(
         default=None,
         description="Новый идентификатор компании пользователя."
     )
-
 
 # Схема для чтения данных пользователя (возвращается API) - без пароля
 class UserRead(UserBase):
     """Схема для чтения основной информации о пользователе (без пароля)."""
     id: uuid.UUID = Field(description="Уникальный идентификатор пользователя.")
     lsn: int = Field(description="Последовательный номер записи (LSN) для отслеживания порядка изменений.")
-    # Связанные данные (company, groups) не включаются в базовую схему чтения
 
 # Схема для чтения пользователя с информацией о его группах
 class UserReadWithGroups(UserRead):
     """Схема для чтения пользователя с информацией о группах, в которых он состоит."""
+    # --- ИСПРАВЛЕНИЕ: Можно убрать кавычки, если нет цикла импорта ---
     groups: List[GroupRead] = Field(
         default=[],
         description="Список групп, в которых состоит пользователь."
     )
+    # -------------------------------------------------------------
 
 logger.debug("User schemas defined: UserBase, UserCreate, UserUpdate, UserRead, UserReadWithGroups")

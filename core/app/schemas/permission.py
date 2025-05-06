@@ -55,3 +55,4 @@ class PermissionRead(PermissionBase):
     lsn: int = Field(description="Последовательный номер записи (LSN) для отслеживания порядка изменений.")
 
 logger.debug("Permission schemas defined: PermissionBase, PermissionCreate, PermissionUpdate, PermissionRead")
+

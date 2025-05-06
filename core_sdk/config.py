@@ -1,10 +1,6 @@
+# core_sdk/config.py
 import os
 
-from pydantic_settings import BaseSettings
-from pydantic import Field
-from typing import List
-
-# core_sdk/config.py
 from pydantic_settings import BaseSettings, SettingsConfigDict # Импортируем SettingsConfigDict для v2
 from pydantic import Field
 from typing import List

@@ -1,19 +1,19 @@
 # core/app/main.py
 import logging
-import os # Нужен для uvicorn.run, если используется
+import os
 
 # Импортируем фабрику создания приложения из SDK
 from core_sdk.app_setup import create_app_with_sdk_setup
 
 # Локальные импорты Core
 from .config import settings
-# Импортируем модуль registry_config, чтобы конфигурация реестра выполнилась при старте
-# Это важно сделать ДО вызова create_app_with_sdk_setup, если он использует ModelRegistry
-from . import registry_config # noqa: F401 (выполнит код при импорте)
-# Импортируем функцию инициализации прав, чтобы передать ее в фабрику
+from . import registry_config # noqa: F401
 from .permissions_init import ensure_base_permissions
+# --- ИМПОРТИРУЕМ СХЕМЫ ДЛЯ REBUILD ---
+from . import schemas as app_schemas
+# ------------------------------------
 
-# Импорты роутеров API, которые нужно подключить
+# Импорты роутеров API
 from .api.endpoints import (
     auth, users, companies, groups, permissions, i18n,
 )
@@ -24,8 +24,7 @@ logger = logging.getLogger("app.main")
 
 logger.info("--- Starting Core Service Application Setup ---")
 
-# Список роутеров для включения в приложение
-# Каждый элемент должен быть экземпляром APIRouter
+# Список роутеров для включения
 api_routers_to_include = [
     auth.router,
     users.user_factory.router,
@@ -35,61 +34,56 @@ api_routers_to_include = [
     i18n.router,
 ]
 
-# --- Хуки жизненного цикла (примеры, если нужны) ---
-async def core_before_startup():
-    logger.info("Running Core specific actions BEFORE SDK startup...")
-    # Например, проверка доступности внешнего сервиса, не управляемого SDK
+# --- СПИСОК СХЕМ ДЛЯ ЯВНОГО REBUILD ---
+# Добавьте сюда все схемы вашего приложения, использующие ForwardRefs
+schemas_requiring_rebuild = [
+    app_schemas.group.GroupReadWithDetails,
+    app_schemas.user.UserReadWithGroups,
+    # app_schemas.company.CompanyReadWithDetails, # Если она тоже использует ForwardRefs
+]
+# ------------------------------------
 
-async def core_after_startup():
-    logger.info("Running Core specific actions AFTER SDK startup...")
-    # Например, загрузка данных в кэш, инициализация специфичных компонентов
+# Хуки жизненного цикла (без изменений)
+async def core_before_startup(): logger.info("Running Core specific actions BEFORE SDK startup...")
+async def core_after_startup(): logger.info("Running Core specific actions AFTER SDK startup...")
+async def core_before_shutdown(): logger.info("Running Core specific actions BEFORE SDK shutdown...")
+async def core_after_shutdown(): logger.info("Running Core specific actions AFTER SDK shutdown...")
 
-async def core_before_shutdown():
-    logger.info("Running Core specific actions BEFORE SDK shutdown...")
-    # Например, сохранение состояния, уведомление других сервисов
-
-async def core_after_shutdown():
-    logger.info("Running Core specific actions AFTER SDK shutdown...")
-    # Например, финальная очистка
-
-# --- Создание приложения с помощью фабрики SDK ---
+# Создаем приложение с помощью фабрики SDK
 app = create_app_with_sdk_setup(
     settings=settings,
     api_routers=api_routers_to_include,
-    run_base_permissions_init=True, # Включаем инициализацию прав для Core
-    enable_broker=True,             # Включаем брокер для Core
-    rebuild_models=True,            # Включаем ребилд моделей
-    manage_http_client=True,        # Управляем HTTP клиентом (на случай будущих удаленных вызовов)
-    # Передаем хуки
+    run_base_permissions_init=True,
+    enable_broker=True,
+    rebuild_models=True,
+    manage_http_client=True,
+    schemas_to_rebuild=schemas_requiring_rebuild, # <--- Передаем список схем
     before_startup_hook=core_before_startup,
     after_startup_hook=core_after_startup,
     before_shutdown_hook=core_before_shutdown,
     after_shutdown_hook=core_after_shutdown,
-    # extra_middleware=None, # Дополнительные middleware, если нужны
     title=settings.PROJECT_NAME,
     description="Core service for the platform.",
     version="0.1.0",
-    include_health_check=True # Включаем стандартный health check
+    include_health_check=True
 )
 
 logger.info("--- Core Service Application Setup Complete ---")
 
-# --- Точка входа для Uvicorn (для локальной разработки) ---
+# Точка входа для Uvicorn (без изменений)
 if __name__ == "__main__":
     import uvicorn
-    # Используем настройки из settings для порта и уровня логов
-    # Host 0.0.0.0 делает приложение доступным извне контейнера/сети
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     log_level = settings.LOGGING_LEVEL.lower()
-    workers = int(os.getenv("WEB_CONCURRENCY", "1")) # Количество воркеров Uvicorn
+    workers = int(os.getenv("WEB_CONCURRENCY", "1"))
 
     logger.info(f"Starting Uvicorn development server on {host}:{port} with {workers} worker(s)...")
     uvicorn.run(
-        "core.app.main:app", # Путь к экземпляру FastAPI app
+        "core.app.main:app",
         host=host,
         port=port,
         log_level=log_level,
-        reload=True, # Включаем автоперезагрузку для разработки
-        workers=workers # Количество воркеров
+        reload=True,
+        workers=workers
     )
