@@ -1,0 +1,44 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+*/.venv/ # Игнорировать .venv во всех поддиректориях
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# IDE files
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and databases
+*.log
+*.db
+*.sqlite3
+
+# Environment variables
+.env*
+!.env.example # Не игнорировать пример файла .env
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Mypy cache
+.mypy_cache/
+
+# Если НЕ коммитите lock-файлы
+# */requirements.lock

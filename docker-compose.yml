@@ -1,0 +1,100 @@
+services:
+  # --- База данных PostgreSQL ---
+  db:
+    image: postgres:15-alpine # Используем легковесный образ Alpine
+    container_name: egrocery_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Том для сохранения данных БД
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh # Скрипт для инициализации БД (см. ниже)
+    environment:
+      # Эти переменные используются PostgreSQL для создания суперпользователя и БД по умолчанию
+      # НЕ используйте их напрямую в приложениях, у них свои пользователи/БД из .env
+      POSTGRES_USER: main_user
+      POSTGRES_PASSWORD: main_password # Замените на надежный пароль
+      POSTGRES_DB: main_db # БД по умолчанию, можно не использовать
+    ports:
+      - "5432:5432" # Пробрасываем порт для возможного доступа с хоста (опционально)
+    networks:
+      - egrocery-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Кэш Redis ---
+  redis:
+    image: redis:7-alpine
+    container_name: egrocery_redis
+    volumes:
+      - redis_data:/data # Том для сохранения данных Redis (если нужно)
+    ports:
+      - "6379:6379" # Пробрасываем порт для возможного доступа с хоста (опционально)
+    networks:
+      - egrocery-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Core Service ---
+  core:
+    build:
+      context: ./core # Путь к директории с Dockerfile для core
+      dockerfile: Dockerfile
+    container_name: egrocery_core
+    env_file:
+      - ./core/.env # Загружаем переменные окружения из .env файла core
+    volumes:
+      # Монтируем код для live reload в режиме разработки (ЗАКОММЕНТИРОВАТЬ для production)
+      - ./core/app:/app/app
+      - ./core/core_sdk:/app/core_sdk
+    ports:
+      - "8000:8000" # Маппинг порта core сервиса
+    networks:
+      - egrocery-net
+    depends_on:
+      db:
+        condition: service_healthy # Запускаем core только после старта БД
+      redis:
+        condition: service_healthy # Запускаем core только после старта Redis
+    # Команда для запуска с --reload для разработки (ЗАМЕНИТЬ/УДАЛИТЬ для production)
+    command: uvicorn core.app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # --- WMS Service ---
+  wms:
+    build:
+      context: ./wms # Путь к директории с Dockerfile для wms
+      dockerfile: Dockerfile
+    container_name: egrocery_wms
+    env_file:
+      - ./wms/.env # Загружаем переменные окружения из .env файла wms
+    volumes:
+      # Монтируем код для live reload в режиме разработки (ЗАКОММЕНТИРОВАТЬ для production)
+      - ./wms/app:/app/app
+    ports:
+      - "8001:8001" # Маппинг порта wms сервиса
+    networks:
+      - egrocery-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      core: # WMS может зависеть от Core
+        condition: service_started # Достаточно, чтобы core начал запускаться
+    # Команда для запуска с --reload для разработки (ЗАМЕНИТЬ/УДАЛИТЬ для production)
+    command: uvicorn wms.app.main:app --host 0.0.0.0 --port 8001 --reload
+
+# --- Сети ---
+networks:
+  egrocery-net:
+    driver: bridge # Стандартная сеть Docker
+
+# --- Тома ---
+volumes:
+  postgres_data:
+    driver: local # Используем локальный драйвер для хранения данных БД
+  redis_data:
+    driver: local # Используем локальный драйвер для хранения данных Redis
