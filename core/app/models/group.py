@@ -4,19 +4,18 @@ import uuid
 from typing import Optional, List, TYPE_CHECKING
 
 from sqlmodel import Field, Relationship
-from sqlalchemy import Column, ForeignKey, UniqueConstraint # Убраны неиспользуемые импорты SQLAlchemy
+from sqlalchemy import Column, ForeignKey, UniqueConstraint, TEXT, ARRAY  # Убраны неиспользуемые импорты SQLAlchemy
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID # Оставляем PG_UUID для ForeignKey
 
 # Импорт базовой модели и фильтра из SDK
 from core_sdk.db import BaseModelWithMeta
 from core_sdk.filters.base import DefaultFilter
-
+from .user import User, UserGroupLink
 # Относительные импорты для связующих моделей и моделей для TYPE_CHECKING
-from .link_models import UserGroupLink, GroupPermissionLink
+
 
 if TYPE_CHECKING:
-    from .user import User
-    from .permission import Permission
+
     from .company import Company
 
 logger = logging.getLogger("app.models.group") # Логгер для этого модуля
@@ -62,10 +61,10 @@ class Group(BaseModelWithMeta, table=True):
         link_model=UserGroupLink,
         sa_relationship_kwargs={"lazy": "selectin"} # Пример настройки загрузки
     )
-    permissions: List["Permission"] = Relationship(
-        back_populates="groups",
-        link_model=GroupPermissionLink,
-        sa_relationship_kwargs={"lazy": "selectin"} # Пример настройки загрузки
+    permissions: List[str] = Field(
+        default=[],
+        sa_column=Column(ARRAY(TEXT), nullable=False, server_default='{}'),
+        description="Список коднаймов прав доступа, назначенных этой группе."
     )
 
 class GroupFilter(DefaultFilter):

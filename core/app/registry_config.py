@@ -4,7 +4,6 @@ import logging
 # Импорты фильтров из моделей
 from .models.company import CompanyFilter
 from .models.group import GroupFilter
-from .models.permission import PermissionFilter
 from .models.user import UserFilter
 
 # Импорты из SDK
@@ -64,16 +63,6 @@ def configure_core_registry():
             update_schema_cls=schemas.group.GroupUpdate,
             read_schema_cls=schemas.group.GroupRead,
             model_name="Group"
-        )
-        # Регистрация Permission (использует базовый менеджер)
-        ModelRegistry.register_local(
-            model_cls=models.permission.Permission,
-            manager_cls=BaseDataAccessManager, # Используем базовый менеджер из SDK
-            filter_cls=PermissionFilter,
-            create_schema_cls=schemas.permission.PermissionCreate,
-            update_schema_cls=schemas.permission.PermissionUpdate,
-            read_schema_cls=schemas.permission.PermissionRead,
-            model_name="Permission"
         )
         logger.info("ModelRegistry configuration complete for Core service.")
     except Exception as e:

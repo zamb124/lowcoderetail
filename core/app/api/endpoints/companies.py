@@ -10,8 +10,9 @@ from taskiq import TaskiqResult # Оставляем для type hinting
 from core_sdk.crud.factory import CRUDRouterFactory
 from core_sdk.data_access import DataAccessManagerFactory, get_dam_factory
 from core_sdk.exceptions import CoreSDKError # Для обработки ошибок брокера
+from core_sdk.dependencies.auth import get_current_superuser, require_permission, get_current_user
+from core_sdk.permissions.enums import BasePermission
 
-from .. import deps # Используем app. для импорта из текущего приложения
 # models и schemas не используются напрямую, т.к. фабрика работает с именами
 from ...data_access.company_manager import CompanyDataAccessManager # Для type hinting
 from ...schemas.company import CompanyRead # Для response_model
@@ -21,12 +22,16 @@ logger = logging.getLogger(__name__) # Имя будет app.api.endpoints.compa
 company_factory = CRUDRouterFactory(
     model_name="Company",
     prefix='/companies',
-    tags=["Companies"], # Добавляем тег для группировки
-    get_deps=[Depends(deps.get_current_active_superuser)],
-    list_deps=[Depends(deps.get_current_active_superuser)],
-    create_deps=[Depends(deps.get_current_active_superuser)],
-    update_deps=[Depends(deps.get_current_active_superuser)],
-    delete_deps=[Depends(deps.get_current_active_superuser)],
+    tags=["Companies"],
+    # Используем require_permission или get_current_superuser для защиты
+    # get_current_superuser проще, если все операции требуют прав суперюзера
+    get_deps=[Depends(get_current_superuser)], # Только суперюзер может смотреть детали компании
+    list_deps=[Depends(get_current_superuser)], # Только суперюзер может смотреть список компаний
+    create_deps=[Depends(require_permission(BasePermission.COMPANIES_CREATE))], # Нужно право COMPANIES_CREATE
+    update_deps=[Depends(require_permission(BasePermission.COMPANIES_EDIT))],   # Нужно право COMPANIES_EDIT
+    delete_deps=[Depends(require_permission(BasePermission.COMPANIES_DELETE))], # Нужно право COMPANIES_DELETE
+    # Если какие-то операции доступны без прав (например, GET для всех), передайте пустой список:
+    # get_deps=[],
 )
 
 @company_factory.router.post(
@@ -38,7 +43,7 @@ company_factory = CRUDRouterFactory(
             "Этот эндпоинт блокирует ответ до тех пор, пока задача не будет выполнена или не истечет таймаут. "
             "Используйте с осторожностью для задач, которые гарантированно выполняются быстро."
     ),
-    dependencies=[Depends(deps.get_current_active_superuser)]
+    dependencies=[Depends(get_current_user)]
 )
 async def activate_company_and_wait(
         company_id: UUID,

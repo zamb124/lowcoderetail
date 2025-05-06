@@ -21,6 +21,8 @@ from alembic import command
 from starlette.exceptions import HTTPException
 from taskiq import InMemoryBroker, AsyncBroker # Используем AsyncBroker для type hinting
 
+
+
 # --- Добавляем корень проекта в sys.path ---
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 if project_root not in sys.path:
@@ -42,7 +44,7 @@ from core_sdk.data_access import DataAccessManagerFactory, get_dam_factory, get_
 # Конкретные менеджеры для type hinting (опционально, но полезно)
 from core.app.data_access.user_manager import UserDataAccessManager
 from core.app.data_access.company_manager import CompanyDataAccessManager
-
+from core_sdk.data_access import BaseDataAccessManager
 # --- Фикстура для установки переменной окружения ---
 @pytest.fixture(scope='session', autouse=True)
 def set_test_environment():
@@ -336,32 +338,6 @@ def normal_user_password() -> str:
     """Стандартный пароль для тестового обычного пользователя."""
     return "testpassword"
 
-@pytest_asyncio.fixture(scope="function")
-async def test_user(
-    dam_factory_test: DataAccessManagerFactory,
-    test_company: models.company.Company, # Зависимость от созданной компании
-    normal_user_email: str,
-    normal_user_password: str
-) -> models.user.User:
-    """Создает обычного тестового пользователя через DAM внутри managed_session."""
-    print(f"Creating test normal user: {normal_user_email}")
-    user_data_dict = {
-        "email": normal_user_email,
-        "password": normal_user_password,
-        "company_id": test_company.id,
-        "is_active": True,
-        "is_superuser": False,
-    }
-    async with managed_session():
-        try:
-            user_manager: UserDataAccessManager = dam_factory_test.get_manager("User")
-            db_user = await user_manager.create(user_data_dict)
-            print(f"Test normal user created via DAM with ID: {db_user.id}")
-            db_user._test_password = normal_user_password # type: ignore
-            return db_user
-        except Exception as e:
-             pytest.fail(f"Failed to create test normal user via DAM Factory: {e}")
-
 
 # --- Фикстуры токенов (используют async_client) ---
 @pytest_asyncio.fixture(scope="function")
@@ -427,3 +403,79 @@ def test_taskiq_broker(set_test_environment) -> AsyncBroker: # Зависит о
     assert isinstance(broker, InMemoryBroker), \
         f"Expected InMemoryBroker in test mode, but got {type(broker)}. Check  env var and setup.py."
     return broker
+
+@pytest_asyncio.fixture(scope="function")
+async def test_group(
+    dam_factory_test: DataAccessManagerFactory,
+    test_company: models.company.Company # Группа должна принадлежать компании
+) -> models.group.Group:
+    """Создает тестовую группу в БД, используя DAM внутри managed_session."""
+    group_name = f"Test Group {uuid4()}"
+    print(f"Creating test group: {group_name}")
+    group_data_dict = {
+        "name": group_name,
+        "description": "A group created for testing purposes via DAM.",
+        "company_id": test_company.id, # Привязываем к тестовой компании
+        "permissions": [
+            'me',
+            'assign_user_to_group'
+        ], # Права по умолчанию пустые
+        # Поле permissions (список строк) по умолчанию будет пустым
+    }
+    async with managed_session():
+        try:
+            # Используем BaseDataAccessManager, т.к. для Group нет кастомного
+            group_manager: BaseDataAccessManager = dam_factory_test.get_manager("Group")
+            db_group = await group_manager.create(group_data_dict)
+            print(f"Test group created via DAM with ID: {db_group.id}")
+            return db_group
+        except Exception as e:
+            pytest.fail(f"Failed to create test group via DAM Factory: {e}")
+
+@pytest_asyncio.fixture(scope="function")
+async def test_user(
+        dam_factory_test: DataAccessManagerFactory,
+        test_company: models.company.Company,
+        test_group: models.group.Group, # <--- Добавляем зависимость от тестовой группы
+        normal_user_email: str,
+        normal_user_password: str
+) -> models.user.User:
+    """
+    Создает обычного тестового пользователя и назначает его в тестовую группу.
+    """
+    print(f"Creating test normal user: {normal_user_email}")
+    user_data_dict = {
+        "email": normal_user_email,
+        "password": normal_user_password,
+        "company_id": test_company.id,
+        "is_active": True,
+        "is_superuser": False,
+    }
+    async with managed_session(): # Управляем сессией здесь
+        try:
+            user_manager: UserDataAccessManager = dam_factory_test.get_manager("User")
+            # Шаг 1: Создаем пользователя
+            db_user = await user_manager.create(user_data_dict)
+            print(f"Test normal user created via DAM with ID: {db_user.id}")
+            db_user._test_password = normal_user_password # type: ignore
+
+            # Шаг 2: Назначаем пользователя в тестовую группу
+            # Используем новый метод assign_to_group из UserDataAccessManager
+            # Этот метод сам обработает коммит и refresh для пользователя
+            print(f"Assigning user {db_user.id} to group {test_group.id}...")
+            # Важно: assign_to_group возвращает обновленного пользователя,
+            # но мы уже имеем db_user в текущей сессии.
+            # Если assign_to_group делает commit, то db_user уже будет обновлен
+            # (или его нужно будет обновить через refresh, если assign_to_group не делает этого).
+            # Метод assign_to_group в UserDataAccessManager уже делает commit и refresh.
+            await user_manager.assign_to_group(user_id=db_user.id, group_id=test_group.id)
+
+            # Перезагружаем пользователя, чтобы убедиться, что связь с группой установлена
+            # Это может быть избыточно, если assign_to_group уже делает refresh.
+            await user_manager.session.refresh(db_user, attribute_names=['groups'])
+            print(f"User {db_user.id} assigned to group. Groups: {[g.name for g in db_user.groups]}")
+
+            return db_user
+        except Exception as e:
+            pytest.fail(f"Failed to create test normal user or assign to group: {e}")
+

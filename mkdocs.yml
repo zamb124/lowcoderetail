@@ -1,0 +1,87 @@
+site_name: LowCodeRetail Framework
+site_description: 'Фреймворк для быстрой разработки микросервисов платформы LowCodeRetail.'
+site_author: 'Viktor Shved' # Замените на ваше имя/команду
+
+theme:
+  name: material
+  language: ru # Язык интерфейса темы
+  palette:
+    # Основная цветовая схема (Light mode)
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo # Основной цвет (например, indigo, blue, teal)
+      accent: pink   # Акцентный цвет
+      toggle:
+        icon: material/weather-sunny
+        name: Переключить на темную тему
+    # Альтернативная цветовая схема (Dark mode)
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: pink
+      toggle:
+        icon: material/weather-night
+        name: Переключить на светлую тему
+  features:
+    - navigation.tabs # Вкладки для основной навигации
+    - navigation.sections # Раскрывающиеся секции в боковой панели
+    - navigation.top # Кнопка "Наверх"
+    - search.suggest # Предложения при поиске
+    - search.highlight # Подсветка результатов поиска
+    - content.code.annotate # Аннотации к блокам кода
+    - content.tabs.link # Связанные вкладки контента
+  icon:
+    repo: fontawesome/brands/git-alt # Иконка для ссылки на репозиторий
+
+repo_url: https://github.com/your_username/lowcoderetail # TODO: Замените на URL вашего репозитория
+repo_name: your_username/lowcoderetail # TODO: Замените
+
+nav:
+  - 'Введение': 'index.md'
+  - 'Быстрый старт': 'quickstart.md'
+  - 'Архитектура': 'architecture.md'
+  - 'Core SDK':
+    - 'Обзор': 'core_sdk/index.md'
+    - 'Конфигурация': 'core_sdk/config.md'
+    - 'Настройка приложения': 'core_sdk/app_setup.md'
+    - 'База данных': 'core_sdk/database.md'
+    - 'Доступ к данным (DAM)': 'core_sdk/data_access.md'
+    - 'CRUD Роутеры': 'core_sdk/crud_factory.md'
+    - 'Аутентификация и Авторизация': 'core_sdk/auth_security.md'
+    - 'Брокер задач (Taskiq)': 'core_sdk/broker_taskiq.md'
+    - 'Схемы': 'core_sdk/schemas.md'
+    - 'Исключения': 'core_sdk/exceptions.md'
+    - 'Логирование': 'core_sdk/logging.md'
+  - 'Создание нового сервиса': 'creating_new_service.md'
+  - 'Участие в разработке': 'contributing.md'
+
+plugins:
+  - search:
+      lang: ru # Язык для поиска
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true # Показывать заголовок для корневого объекта
+            show_source: false      # Не показывать исходный код по умолчанию
+            members_order: source   # Порядок членов класса/модуля как в исходниках
+            # Опции для отображения типов
+            show_signature_annotations: true
+            separate_signature: true # Подпись метода на отдельной строке
+            # Группировка по типу (методы, атрибуты и т.д.)
+            group_by_category: true
+            # Показать унаследованные члены (можно отключить, если много шума)
+            # show_inherited_members: false
+markdown_extensions:
+  - pymdownx.highlight: # Подсветка синтаксиса
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets # Вставка фрагментов кода из файлов
+  - pymdownx.superfences # Улучшенные блоки кода
+  - admonition # Блоки "примечание", "важно" и т.д.
+  - pymdownx.details # Раскрывающиеся блоки
+  - pymdownx.tabbed: # Вкладки
+      alternate_style: true
+  - toc: # Оглавление
+      permalink: true # Постоянные ссылки на заголовки
+      toc_depth: 3 # Глубина оглавления

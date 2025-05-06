@@ -5,6 +5,7 @@ from uuid import UUID
 import datetime # Нужен для datetime.now()
 
 from fastapi import HTTPException, status # Добавляем status
+from sqlalchemy.exc import IntegrityError
 
 # Импортируем базовый менеджер и нужные типы из SDK
 from core_sdk.data_access.base_manager import BaseDataAccessManager
@@ -200,15 +201,68 @@ class UserDataAccessManager(BaseDataAccessManager[models.user.User, schemas.user
         else:
             logger.warning(f"User model does not have 'last_login' attribute. Cannot update last login time for user {user.email}.")
 
-    # --- Примеры других возможных кастомных методов ---
-    # async def get_active_users_in_company(self, company_id: UUID) -> List[models.user.User]:
-    #     """Получает список активных пользователей в указанной компании."""
-    #     logger.info(f"Getting active users for company {company_id}")
-    #     results = await self.list(filters={"company_id": company_id, "is_active": True})
-    #     return results.get("items", [])
+    async def assign_to_group(self, user_id: UUID, group_id: UUID) -> models.user.User:
+        """
+        Назначает пользователя указанной группе.
 
-    # async def set_user_active_status(self, user_id: UUID, is_active: bool) -> models.user.User:
-    #     """Устанавливает статус активности пользователя."""
-    #     logger.info(f"Setting active status to {is_active} for user {user_id}")
-    #     updated_user = await self.update(user_id, {"is_active": is_active})
-    #     return updated_user
+        :param user_id: ID пользователя.
+        :param group_id: ID группы.
+        :return: Обновленный объект User с загруженными группами.
+        :raises HTTPException(404): Если пользователь или группа не найдены.
+        :raises HTTPException(500): При ошибках базы данных.
+        """
+        logger.info(f"UserDataAccessManager: Assigning user {user_id} to group {group_id}.")
+
+        user = await self.get(user_id) # Используем self.get() для получения пользователя
+        if not user:
+            logger.warning(f"User {user_id} not found for group assignment.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        try:
+            group = await self.session.get(models.group.Group, group_id)
+        except Exception as e:
+            logger.exception(f"Error fetching group {group_id} during user assignment.")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve group information.")
+
+        if not group:
+            logger.warning(f"Group {group_id} not found for assigning user {user_id}.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+
+        # Загрузка или проверка атрибута 'groups'
+        # SQLAlchemy обычно лениво загружает связи, но для проверки 'in' лучше убедиться, что они загружены.
+        # Если связь уже загружена (например, eager loading), refresh не обязателен.
+        if not self.session.is_active: # Проверка на случай, если сессия была закрыта
+            logger.error("Session is not active before refreshing user groups.")
+            raise CoreSDKError("Database session is not active.")
+
+        try:
+            # Проверяем, загружена ли уже коллекция. Если нет, SQLAlchemy попытается загрузить ее при доступе.
+            # Явный refresh может быть избыточен, если нет специфичных требований к свежести данных.
+            # await self.session.refresh(user, attribute_names=['groups'])
+            pass # SQLAlchemy должен сам загрузить user.groups при первом доступе
+        except Exception as e_refresh:
+            logger.exception(f"Failed to ensure user.groups collection is loaded for user {user_id}.")
+            raise HTTPException(status_code=500, detail="Could not process user groups.")
+
+
+        if group not in user.groups:
+            user.groups.append(group)
+            self.session.add(user) # Добавляем пользователя в сессию для сохранения связи
+            try:
+                await self.session.commit()
+                # После коммита обновляем пользователя, чтобы связи корректно отобразились
+                await self.session.refresh(user, attribute_names=['groups'])
+                logger.info(f"User {user.id} ('{user.email}') successfully assigned to group {group.id} ('{group.name}').")
+            except IntegrityError as e: # Ловим специфичные ошибки БД
+                await self.session.rollback()
+                logger.error(f"Database integrity error assigning user {user.id} to group {group.id}.", exc_info=True)
+                # Можно проанализировать e.orig для более детальной ошибки
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Failed to assign user to group due to a data conflict.")
+            except Exception as e:
+                await self.session.rollback()
+                logger.exception(f"Error committing user-group assignment for user {user.id}.")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not assign user to group due to a database error.")
+        else:
+            logger.info(f"User {user.id} ('{user.email}') already in group {group.id} ('{group.name}'). No action taken.")
+
+        return user

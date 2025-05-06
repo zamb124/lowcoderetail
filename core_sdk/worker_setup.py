@@ -1,6 +1,7 @@
 # core_sdk/worker_setup.py
 import logging
 import importlib
+import os
 from typing import Optional, Any, Dict
 
 # Импорты из SDK

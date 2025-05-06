@@ -8,14 +8,13 @@ from core_sdk.app_setup import create_app_with_sdk_setup
 # Локальные импорты Core
 from .config import settings
 from . import registry_config # noqa: F401
-from .permissions_init import ensure_base_permissions
 # --- ИМПОРТИРУЕМ СХЕМЫ ДЛЯ REBUILD ---
 from . import schemas as app_schemas
 # ------------------------------------
 
 # Импорты роутеров API
 from .api.endpoints import (
-    auth, users, companies, groups, permissions, i18n,
+    auth, users, companies, groups, i18n,
 )
 
 # Настройка логгера
@@ -30,7 +29,6 @@ api_routers_to_include = [
     users.user_factory.router,
     companies.company_factory.router,
     groups.group_factory.router,
-    permissions.permission_factory.router,
     i18n.router,
 ]
 
@@ -53,11 +51,14 @@ async def core_after_shutdown(): logger.info("Running Core specific actions AFTE
 app = create_app_with_sdk_setup(
     settings=settings,
     api_routers=api_routers_to_include,
-    run_base_permissions_init=True,
     enable_broker=True,
     rebuild_models=True,
     manage_http_client=True,
-    schemas_to_rebuild=schemas_requiring_rebuild, # <--- Передаем список схем
+    schemas_to_rebuild=schemas_requiring_rebuild,
+    # --- Управляем AuthMiddleware ---
+    enable_auth_middleware=True, # Включаем AuthMiddleware
+    auth_allowed_paths=["/api/v1/docs", "/api/v1/redoc", "/service-worker.js", "/api/v1/openapi.json", "/service-worker.js"], # Доп. публичные пути Core
+    # -------------------------------
     before_startup_hook=core_before_startup,
     after_startup_hook=core_after_startup,
     before_shutdown_hook=core_before_shutdown,

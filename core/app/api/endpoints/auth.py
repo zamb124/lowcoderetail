@@ -57,35 +57,50 @@ async def login_for_access_token(
 
     logger.info(f"User {user.email} authenticated successfully. Generating tokens.")
     token_data = {"sub": user.email, "user_id": str(user.id)}
-
+    user_permissions = set()
     try:
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data=token_data,
-            secret_key=settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM,
-            expires_delta=access_token_expires,
-        )
-
-        refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
-        refresh_token = create_refresh_token(
-             data={"user_id": str(user.id)}, # Только user_id в refresh токене для безопасности
-             secret_key=settings.SECRET_KEY,
-             algorithm=settings.ALGORITHM,
-             expires_delta=refresh_token_expires,
-        )
+        # Нужно загрузить группы пользователя. Проще всего через сессию.
+        user_manager: UserDataAccessManager = dam_factory.get_manager("User")
+        await user_manager.session.refresh(user, attribute_names=['groups']) # Загружаем группы
+        if user.groups:
+            for group in user.groups:
+                # Добавляем права из каждой группы в set для уникальности
+                user_permissions.update(group.permissions)
+        logger.debug(f"Collected permissions for user {user.email}: {user_permissions}")
     except Exception as e:
-        logger.exception(f"Error creating tokens for user {user.email}.")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not create authentication tokens.",
-        )
+        logger.exception(f"Failed to load groups or permissions for user {user.email} during login.")
+        # Решите, как обрабатывать: запретить вход или войти без прав?
+        # Запретим вход для безопасности:
+        raise HTTPException(status_code=500, detail="Could not retrieve user permissions.")
 
-    return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
+        # --- Создание токенов с правами ---
+    token_payload_data = {
+        "sub": user.email,
+        "user_id": str(user.id),
+        "company_id": str(user.company_id) if user.company_id else None,
+        "is_active": user.is_active,
+        "is_superuser": user.is_superuser,
+        "perms": sorted(list(user_permissions)) # Добавляем отсортированный список прав
     }
+    refresh_payload_data = {"user_id": str(user.id)} # Refresh токен без лишних данных
+
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data=token_payload_data, # Передаем расширенные данные
+        secret_key=settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+        expires_delta=access_token_expires,
+    )
+
+    refresh_token_expires = timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    refresh_token = create_refresh_token(
+        data=refresh_payload_data,
+        secret_key=settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+        expires_delta=refresh_token_expires,
+    )
+
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
 @router.post("/refresh", response_model=Token)
 async def refresh_access_token(

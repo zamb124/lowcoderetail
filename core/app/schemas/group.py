@@ -8,9 +8,6 @@ from sqlmodel import SQLModel, Field
 # Абсолютный импорт схемы пользователя из SDK
 from core_sdk.schemas.user import UserRead
 
-# --- ИСПРАВЛЕНИЕ: Прямой импорт PermissionRead ---
-# Импортируем класс напрямую, чтобы он был доступен во время выполнения model_rebuild()
-from .permission import PermissionRead
 # -------------------------------------------------
 
 logger = logging.getLogger("app.schemas.group")
@@ -28,6 +25,10 @@ class GroupBase(SQLModel):
     )
     company_id: uuid.UUID = Field(description="Идентификатор компании, к которой принадлежит группа.")
 
+    permissions: List[str] = Field(
+        default_factory=list, # Для Pydantic, чтобы по умолчанию был пустой список
+        description="Список коднаймов прав доступа, назначенных этой группе."
+    )
 # Схема для создания новой группы
 class GroupCreate(GroupBase):
     """Схема для создания новой группы."""
@@ -46,6 +47,10 @@ class GroupUpdate(SQLModel):
         max_length=255,
         description="Новое описание группы."
     )
+    permissions: Optional[List[str]] = Field(
+        default=None,
+        description="Новый список коднаймов прав доступа для группы (полностью заменяет старый)."
+    )
 
 # Схема для чтения данных группы (без связей)
 class GroupRead(GroupBase):
@@ -55,18 +60,10 @@ class GroupRead(GroupBase):
 
 # Схема для чтения данных группы со связанными пользователями и правами
 class GroupReadWithDetails(GroupRead):
-    """Схема для чтения группы с детальной информацией о пользователях и правах."""
-    users: List[UserRead] = Field(
+    users: List[UserRead] = Field(...)
+    permissions: List[str] = Field( # <--- Изменено на List[str]
         default=[],
-        description="Список пользователей, входящих в эту группу."
-    )
-    # --- ИСПРАВЛЕНИЕ: Можно убрать кавычки, если нет цикла импорта ---
-    # Если есть цикл импорта (permission.py импортирует group.py),
-    # то кавычки нужно оставить: List["PermissionRead"]
-    # Но прямой импорт выше все равно необходим для model_rebuild.
-    permissions: List[PermissionRead] = Field(
-        default=[],
-        description="Список прав доступа, назначенных этой группе."
+        description="Список коднаймов прав доступа, назначенных этой группе."
     )
     # -------------------------------------------------------------
 

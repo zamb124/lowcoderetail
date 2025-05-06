@@ -14,13 +14,30 @@ from core_sdk.db import BaseModelWithMeta
 from core_sdk.filters.base import DefaultFilter
 
 # Относительные импорты для связующих моделей и TYPE_CHECKING
-from .link_models import UserGroupLink
 
 if TYPE_CHECKING:
     from .company import Company
     from .group import Group
 
 logger = logging.getLogger("app.models.user") # Логгер для этого модуля
+
+class UserGroupLink(SQLModel, table=True):
+    """
+    Связующая модель (таблица) для отношения многие-ко-многим
+    между пользователями (User) и группами (Group).
+    """
+    user_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="users.id", # Внешний ключ к таблице users
+        primary_key=True,
+        description="Идентификатор пользователя (внешний ключ)"
+    )
+    group_id: Optional[uuid.UUID] = Field(
+        default=None,
+        foreign_key="groups.id", # Внешний ключ к таблице groups
+        primary_key=True,
+        description="Идентификатор группы (внешний ключ)"
+    )
 
 class User(BaseModelWithMeta, table=True):
     """
@@ -86,6 +103,7 @@ class User(BaseModelWithMeta, table=True):
         link_model=UserGroupLink,
         sa_relationship_kwargs={"lazy": "selectin"} # Пример настройки загрузки
     )
+
 
 class UserFilter(DefaultFilter):
     """

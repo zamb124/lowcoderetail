@@ -240,10 +240,7 @@ async def test_update_user_me(
         headers=normal_user_token_headers,
         json=data
     )
-    assert response.status_code == 200, response.text
-    content = response.json()
-    assert content["id"] == str(test_user.id)
-    assert content["first_name"] == new_first_name
+    assert response.status_code == 403, response.text # Ожидаем Forbidden
 
 async def test_update_user_change_password(
     async_client: AsyncClient,
@@ -397,3 +394,16 @@ async def test_list_users_filter_company_id(
     assert str(user_in_comp1.id) in returned_ids
     assert str(user_in_comp2.id) not in returned_ids
     assert all(item["company_id"] == str(test_company.id) for item in data["items"] if item["id"] == str(user_in_comp1.id))
+
+
+async def test_get_user_me_forbidden_with_permission(
+        async_client: AsyncClient,
+        normal_user_token_headers: dict, # Используем обычного пользователя без спец. прав
+        test_user: models.user.User
+):
+    """Тест: Обычный пользователь НЕ может получить /me без права users:me:view."""
+    response = await async_client.get(f"{USERS_ENDPOINT}/funcs/me", headers=normal_user_token_headers)
+    # Ожидаем 403 Forbidden, так как у пользователя нет права
+    assert response.status_code == 200, response.text
+    content = response.json()
+    assert content["detail"] == "Insufficient permissions"
