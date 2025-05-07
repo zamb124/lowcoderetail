@@ -18,17 +18,3 @@ class BaseAppSettings(BaseSettings):
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 5
     ENV: str = os.getenv('ENV', 'PROD')
-
-    # Используем model_config для Pydantic v2
-    model_config = SettingsConfigDict(
-        # Указываем стандартное имя файла .env
-        env_file=".env",
-        env_file_encoding='utf-8',
-        case_sensitive=True,
-        # extra='ignore' # Игнорировать лишние переменные в .env (опционально)
-    )
-    # Для Pydantic v1 использовался вложенный класс Config:
-    # class Config:
-    #     env_file = ".env"
-    #     env_file_encoding = 'utf-8'
-    #     case_sensitive = True
