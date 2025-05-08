@@ -1,0 +1,93 @@
+{# core_sdk/frontend/templates/components/table.html #}
+{# Ожидает: ctx (RenderContext), request, user, url_for #}
+<div class="card shadow-sm" {# Используем card Datta Able #}
+     id="{{ ctx.html_id }}"
+     list-model="{{ ctx.model_name }}"
+     hx-trigger="refreshData from:body" {# Слушаем событие для обновления #}
+     {# URL для полного обновления, включая query параметры для сохранения фильтров/сортировки #}
+     hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}?{{ request.query_params | urlencode }}"
+     hx-target="#{{ ctx.html_id }}"
+     hx-swap="outerHTML" {# Заменяем весь блок при обновлении #}
+     >
+    <div class="card-header">
+        <h3 class="card-title">{{ ctx.title }}</h3>
+        <div class="card-toolbar">
+            {# TODO: Добавить элементы фильтрации #}
+            {% if ctx.can_create %}
+            <button type="button" class="btn btn-primary"
+                    hx-get="{{ url_for('get_create_form', model_name=ctx.model_name) }}"
+                    hx-target="#modal-placeholder" {# Загружаем форму в модальное окно #}
+                    hx-swap="innerHTML"
+                    {# data-bs-toggle="modal" data-bs-target="#..." - Bootstrap сам покажет модалку после загрузки #}
+                    >
+                <i class="ti ti-plus me-1"></i> {# Иконка Tabler #}
+                Создать {{ ctx.model_name }}
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body py-3"> {# Убрал padding сверху/снизу #}
+        <div class="table-responsive">
+            <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4"> {# Классы Datta Able #}
+                <thead>
+                    <tr class="fw-bold text-muted">
+                        {% set table_fields = ctx.fields %} {# Используем поля из контекста #}
+                        {% for field_ctx in table_fields %}
+                             {# Пропускаем скрытые или ненужные в таблице поля #}
+                             {% if field_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_ctx.extra.get('table_hidden') %}
+                                <th class="min-w-150px">{{ field_ctx.label }}</th> {# Класс для ширины #}
+                             {% endif %}
+                        {% endfor %}
+                        <th class="min-w-100px text-end">Действия</th>
+                    </tr>
+                </thead>
+                {# Используем hx-get для подгрузки следующей страницы (если есть пагинация) #}
+                <tbody id="tbody-table--{{ ctx.model_name }}"
+                       {% if ctx.pagination and ctx.pagination.next_cursor %}
+                       {# Формируем URL для следующей страницы, сохраняя текущие фильтры/сортировку #}
+                       {% set next_page_params = request.query_params.copy() %}
+                       {% set _ = next_page_params.setlist('cursor', [ctx.pagination.next_cursor]) %}
+                       hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}?{{ next_page_params | urlencode }}"
+                       hx-trigger="revealed" {# Загрузка при появлении в области видимости #}
+                       hx-select="#tbody-table--{{ ctx.model_name }} > tr" {# Выбираем только строки для добавления #}
+                       hx-swap="beforeend" {# Добавляем строки в конец таблицы #}
+                       {% endif %}
+                       >
+                    {% if ctx.items %}
+                        {% for item in ctx.items %}
+                            {# Передаем поля из контекста рендерера #}
+                            {% include "components/_table_row.html" with {'item': item, 'model_name': ctx.model_name, 'fields': ctx.fields, 'request': request, 'user': user, 'ctx': ctx } %}
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            {# Определяем количество колонок динамически #}
+                            {% set colspan_count = table_fields | rejectattr('name', 'in', ['id', 'lsn', 'vars', 'hashed_password']) | rejectattr('extra.table_hidden') | list | length + 1 %}
+                            <td colspan="{{ colspan_count }}" class="text-center text-muted fs-4 py-10">Нет данных для отображения</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        {# Индикатор загрузки для пагинации #}
+        {% if ctx.pagination and ctx.pagination.next_cursor %}
+        <div class="htmx-indicator text-center py-5">
+             <span class="spinner-border spinner-border-sm align-middle ms-2"></span> Загрузка...
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# Плейсхолдер для модальных окон #}
+<div id="modal-placeholder"></div>
+
+{# Базовое модальное окно Bootstrap 5 для форм (может быть загружено в modal-placeholder) #}
+{# Этот шаблон не используется напрямую здесь, а загружается по запросу кнопок Create/Edit #}
+{# <div class="modal fade" tabindex="-1" id="generic-form-modal-{{ ctx.model_name }}">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+             <div class="modal-body">
+                 <div class="text-center py-10"><span class="spinner-border text-primary"></span></div>
+             </div>
+        </div>
+    </div>
+</div> #}

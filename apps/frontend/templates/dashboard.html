@@ -1,0 +1,56 @@
+{# apps/frontend/templates/dashboard.html #}
+<!-- [ breadcrumb ] start -->
+<div class="page-header">
+    <div class="page-block">
+        <div class="row align-items-center">
+            <div class="col-md-12">
+                <div class="page-header-title">
+                    <h5 class="mb-0">Dashboard</h5>
+                </div>
+            </div>
+            <div class="col-md-12">
+                <ul class="breadcrumb mb-0">
+                    <li class="breadcrumb-item"><a href="#" hx-get="{{ url_for('get_dashboard_content') }}" hx-target="#main-content-area">Home</a></li>
+                    <li class="breadcrumb-item" aria-current="page">Dashboard</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- [ breadcrumb ] end -->
+
+<!-- [ Main Content ] start -->
+<div class="row">
+    <div class="col-md-6 col-xl-4">
+        <div class="card statistics-card-1">
+            <div class="card-body">
+                <img src="{{ SDK_STATIC_URL }}/datta-able/assets/images/widget/img-status-1.svg" alt="img" class="img-fluid img-status" />
+                <div class="d-flex align-items-center">
+                    <h3 class="f-w-600 mb-0">{{ data.metric1 | default('N/A') }}</h3>
+                    <span class="badge bg-light-success ms-2">Metric 1</span>
+                </div>
+                <p class="text-muted mb-2 text-sm mt-3">Some description</p>
+                <div class="progress" style="height: 7px">
+                    <div class="progress-bar bg-brand-color-1" role="progressbar" style="width: 70%" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+     <div class="col-md-6 col-xl-4">
+        <div class="card statistics-card-1">
+            <div class="card-body">
+                 <img src="{{ SDK_STATIC_URL }}/datta-able/assets/images/widget/img-status-2.svg" alt="img" class="img-fluid img-status" />
+                 <div class="d-flex align-items-center">
+                    <h3 class="f-w-600 mb-0">{{ data.metric2 | default('N/A') }}</h3>
+                    <span class="badge bg-light-warning ms-2">Metric 2</span>
+                </div>
+                <p class="text-muted mb-2 text-sm mt-3">Another description</p>
+                <div class="progress" style="height: 7px">
+                    <div class="progress-bar bg-brand-color-2" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Add more dashboard widgets as needed -->
+</div>
+<!-- [ Main Content ] end -->

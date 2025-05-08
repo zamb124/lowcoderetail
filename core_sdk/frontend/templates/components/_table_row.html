@@ -1,0 +1,46 @@
+{# Ожидает: item (SQLModel), model_name (str), fields (List[FieldRenderContext]), request, user, ctx (RenderContext) #}
+<tr ui_key="{{ model_name }}--{{ item.id }}" data-lsn="{{ item.lsn }}"
+    {# Опционально: триггер для обновления строки по WS #}
+    {# hx-get="{{ url_for('get_table_row_view', model_name=model_name, item_id=item.id) }}" #}
+    {# hx-trigger="backend_update from:body" #}
+    {# hx-swap="outerHTML" #}
+    >
+    {% for field_ctx in fields %}
+         {# Пропускаем скрытые или ненужные в таблице поля #}
+         {% if field_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_ctx.extra.get('table_hidden') %}
+             {# Создаем контекст поля для конкретного item #}
+             {% set cell_field_ctx = field_ctx.model_copy(update={'value': item[field_ctx.name], 'mode': 'table'}) %}
+             {% include "components/_table_cell.html" with {'field_ctx': cell_field_ctx, 'item': item, 'model_name': model_name} %}
+         {% endif %}
+    {% endfor %}
+    <td class="text-end">
+        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1"
+           title="Просмотр"
+           hx-get="{{ url_for('get_view', model_name=model_name, item_id=item.id) }}"
+           hx-target="#main-content-area" {# Загружаем в основную область #}
+           hx-push-url="/{{ model_name | lower }}s/{{ item.id }}">
+            <i class="ki-duotone ki-eye fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+        </a>
+        {% if ctx.can_edit %}
+        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1"
+           title="Редактировать"
+           hx-get="{{ url_for('get_edit_form', model_name=model_name, item_id=item.id) }}"
+           hx-target="#modal-placeholder" {# Загружаем форму в модалку #}
+           hx-swap="innerHTML"
+           data-bs-toggle="modal"
+           data-bs-target="#generic-modal-{{ model_name }}">
+            <i class="ki-duotone ki-pencil fs-3"><span class="path1"></span><span class="path2"></span></i>
+        </a>
+        {% endif %}
+         {% if ctx.can_delete %}
+        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm"
+           title="Удалить"
+           hx-get="{{ url_for('get_confirm_delete_modal', model_name=model_name, item_id=item.id) }}"
+           hx-target="#modal-placeholder"
+           hx-swap="innerHTML"
+           >
+            <i class="ki-duotone ki-trash fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+        </a>
+         {% endif %}
+    </td>
+</tr>

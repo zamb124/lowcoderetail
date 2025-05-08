@@ -1,0 +1,165 @@
+{# apps/frontend/templates/components/_sidebar.html #}
+<nav class="pc-sidebar">
+    <div class="navbar-wrapper">
+        <div class="m-header">
+            <a href="/" class="b-brand text-primary">
+                <!-- ========   Change your logo from here   ============ -->
+                <img src="{{ SDK_STATIC_URL }}/datta-able/assets/images/logo-white.svg" class="img-fluid logo-lg"
+                     alt="logo"/>
+            </a>
+        </div>
+        <div class="navbar-content">
+            <ul class="pc-navbar">
+                <li class="pc-item pc-caption">
+                    <label>Navigation</label>
+                </li>
+
+                {# --- Dashboard Link --- #}
+                <li class="pc-item">
+                    <a href="#" class="pc-link"
+                       hx-get="{{ url_for('get_dashboard_content') }}"
+                       hx-target="#main-content-area"
+                       hx-swap="innerHTML"
+                       hx-push-url="/"> {# Обновляем URL на корень #}
+                        <span class="pc-micon"><i data-feather="home"></i></span>
+                        <span class="pc-mtext">Dashboard</span>
+                    </a>
+                </li>
+
+
+                {# --- Пример ссылки на список Users --- #}
+                {% if user and user.has_permission('users:view') %} {# Проверка прав #}
+                    <li class="pc-item">
+                        <a href="#" class="pc-link"
+                           hx-get="{{ url_for('get_list_view', model_name='User') }}"
+                           hx-target="#main-content-area"
+                           hx-swap="innerHTML"
+                           hx-push-url="/users"> {# Пример URL для списка #}
+                            <span class="pc-micon"><i data-feather="users"></i></span>
+                            <span class="pc-mtext">Users</span>
+                        </a>
+                    </li>
+                {% endif %}
+
+                {# --- Пример ссылки на список Companies --- #}
+                {% if user and user.has_permission('companies:view') %} {# Проверка прав #}
+                    <li class="pc-item">
+                        <a href="#" class="pc-link"
+                           hx-get="{{ url_for('get_list_view', model_name='Company') }}"
+                           hx-target="#main-content-area"
+                           hx-swap="innerHTML"
+                           hx-push-url="/companies"> {# Пример URL для списка #}
+                            <span class="pc-micon"><i data-feather="briefcase"></i></span>
+                            <span class="pc-mtext">Companies</span>
+                        </a>
+                    </li>
+                {% endif %}
+
+                {# --- Пример ссылки на список Groups --- #}
+                {% if user and user.has_permission('groups:view') %} {# Проверка прав #}
+                    <li class="pc-item">
+                        <a href="#" class="pc-link"
+                           hx-get="{{ url_for('get_list_view', model_name='Group') }}"
+                           hx-target="#main-content-area"
+                           hx-swap="innerHTML"
+                           hx-push-url="/groups"> {# Пример URL для списка #}
+                            <span class="pc-micon"><i data-feather="users"></i></span>
+                            <span class="pc-mtext">Groups</span>
+                        </a>
+                    </li>
+                {% endif %}
+
+
+                {# --- Пример меню с подменю (если нужно, требует JS Datta Able или кастомного) --- #}
+                <li class="pc-item pc-hasmenu">
+                    <a href="#!" class="pc-link">
+                        <span class="pc-micon"><i data-feather="settings"></i></span>
+                        <span class="pc-mtext">Settings</span>
+                        <span class="pc-arrow"><i class="ti ti-chevron-right"></i></span>
+                    </a>
+                    <ul class="pc-submenu">
+                        <li class="pc-item"><a class="pc-link" href="#">General</a></li>
+                        <li class="pc-item"><a class="pc-link" href="#">Security</a></li>
+                    </ul>
+                </li>
+            {# --- ТЕСТОВОЕ МНОГОУРОВНЕВОЕ МЕНЮ --- #}
+                <li class="pc-item pc-caption">
+                    <label>Test Menu</label>
+                    <i data-feather="list"></i> {# Иконка для заголовка #}
+                </li>
+                <li class="pc-item pc-hasmenu"> {# Уровень 1 #}
+                    <a href="#" class="pc-link">
+                        <span class="pc-micon"><i data-feather="layers"></i></span>
+                        <span class="pc-mtext">Level 1</span>
+                        <span class="pc-arrow"><i class="ti ti-chevron-right"></i></span>
+                    </a>
+                    <ul class="pc-submenu">
+                        <li class="pc-item"><a class="pc-link" href="#">Level 1.1</a></li>
+                        <li class="pc-item pc-hasmenu"> {# Уровень 2 #}
+                            <a href="#" class="pc-link">
+                                <span class="pc-mtext">Level 1.2</span>
+                                <span class="pc-arrow"><i class="ti ti-chevron-right"></i></span>
+                            </a>
+                            <ul class="pc-submenu">
+                                <li class="pc-item"><a class="pc-link" href="#">Level 1.2.1</a></li>
+                                <li class="pc-item"><a class="pc-link" href="#">Level 1.2.2</a></li>
+                                <li class="pc-item pc-hasmenu"> {# Уровень 3 #}
+                                    <a href="#" class="pc-link">
+                                        <span class="pc-mtext">Level 1.2.3</span>
+                                        <span class="pc-arrow"><i class="ti ti-chevron-right"></i></span>
+                                    </a>
+                                    <ul class="pc-submenu">
+                                        <li class="pc-item"><a class="pc-link" href="#">Level 1.2.3.1</a></li>
+                                        <li class="pc-item"><a class="pc-link" href="#">Level 1.2.3.2</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </li>
+                        <li class="pc-item"><a class="pc-link" href="#">Level 1.3</a></li>
+                    </ul>
+                </li>
+                 <li class="pc-item">
+                    <a href="#" class="pc-link">
+                        <span class="pc-micon"><i data-feather="cpu"></i></span>
+                        <span class="pc-mtext">Another Item</span>
+                    </a>
+                </li>
+                {# --- КОНЕЦ ТЕСТОВОГО МЕНЮ --- #}
+
+            </ul>
+        </div>
+    </div>
+    {# Инициализация Feather Icons после загрузки сайдбара #}
+    <script>feather.replace();</script>
+    <script>
+        try {
+            if (typeof feather !== 'undefined') feather.replace();
+        } catch (e) {
+            console.error("Feather init error in sidebar", e);
+        }
+        // Инициализация SimpleBar
+        const sidebarContentEl = document.querySelector('.pc-sidebar .navbar-content');
+        if (sidebarContentEl && typeof SimpleBar !== 'undefined' && !SimpleBar.instances.has(sidebarContentEl)) {
+            try {
+                new SimpleBar(sidebarContentEl);
+            } catch (e) {
+                console.error("Simplebar init error in sidebar", e);
+            }
+        }
+        // Инициализация кликов по меню
+        if (window.app && typeof window.app._initMenuClicks === 'function') {
+            // Даем DOM немного времени на отрисовку после htmx:afterSwap
+            setTimeout(() => {
+                const sidebarNav = document.querySelector('.pc-sidebar .pc-navbar');
+                if (sidebarNav) {
+                    console.debug("Initializing menu clicks inside sidebar...");
+                    window.app._initMenuClicks(sidebarNav); // Вызываем метод глобального объекта
+                } else {
+                    console.warn("Sidebar .pc-navbar not found for menu click initialization.");
+                }
+            }, 50); // Небольшая задержка
+        } else {
+            console.error("window.app or window.app._initMenuClicks is not available for sidebar init.");
+        }
+    </script>
+</nav>

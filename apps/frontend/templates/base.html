@@ -1,0 +1,67 @@
+{# apps/frontend/templates/base.html #}
+<!doctype html>
+{# Атрибуты data-pc-* будут установлены JS при загрузке #}
+<html lang="en">
+<head>
+    {# ... head content ... #}
+    <title>{{ title | default("Admin Panel") }} | CorePlatform</title>
+    <link rel="icon" href="{{ SDK_STATIC_URL }}/datta-able/assets/images/favicon.svg" type="image/x-icon" />
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/tabler-icons.min.css" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/feather.css" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/fontawesome.css" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/material.css" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/phosphor/duotone/style.css" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style.css" id="main-style-link" />
+    <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style-preset.css" />
+    {% block head_css %}{% endblock %}
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+    {# Choices.js (если используется) #}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+     {# Simplebar #}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simplebar@latest/dist/simplebar.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/simplebar@latest/dist/simplebar.min.js"></script>
+
+</head>
+{# Атрибуты data-pc-* будут установлены JS #}
+<body>
+    {% include "components/_loader.html" %}
+
+    {# --- Сайдбар и Хедер загружаются через HTMX --- #}
+    <div hx-get="{{ url_for('get_sidebar_fragment') }}" hx-trigger="load delay:50ms" hx-swap="outerHTML"> {# Небольшая задержка для применения лэйаута #}
+        <nav class="pc-sidebar"><div class="navbar-wrapper"><div class="m-header"><a href="/" class="b-brand text-primary"><img src="{{ SDK_STATIC_URL }}/datta-able/assets/images/favicon.svg" class="img-fluid logo-lg" alt="logo"></a></div><div class="navbar-content"><div class="d-flex justify-content-center p-5"><span class="spinner-border spinner-border-sm"></span></div></div></div></nav>
+    </div>
+    <div hx-get="{{ url_for('get_header_fragment') }}" hx-trigger="load delay:50ms" hx-swap="outerHTML"> {# Небольшая задержка #}
+         <header class="pc-header"><div class="header-wrapper"><div class="me-auto pc-mob-drp"></div><div class="ms-auto"><ul class="list-unstyled"></ul></div></div></header>
+    </div>
+
+    <div class="pc-container">
+        <div class="pc-content" id="main-content-area">
+            {% block content %}
+                <div class="d-flex justify-content-center align-items-center" style="height: 400px;"> <span class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"><span class="visually-hidden">Loading...</span></span> </div>
+            {% endblock %}
+        </div>
+    </div>
+
+    <div hx-get="{{ url_for('get_footer_fragment') }}" hx-trigger="load delay:50ms" hx-swap="outerHTML"> {# Небольшая задержка #}
+        <footer class="pc-footer"><div class="footer-wrapper container-fluid"></div></footer>
+    </div>
+
+    {% include "components/_customizer.html" %}
+
+    <!-- Required Js -->
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/popper.min.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/bootstrap.min.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/fonts/custom-font.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/feather.min.js"></script>
+
+    {# --- Основной JS SDK --- #}
+    <script src="{{ SDK_STATIC_URL }}/js/app.js"></script>
+
+    {% block footer_scripts %}{% endblock %}
+    <div id="modal-placeholder"></div>
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100"></div> {# Контейнер для уведомлений #}
+
+</body>
+</html>

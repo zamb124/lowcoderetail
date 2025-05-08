@@ -1,0 +1,13 @@
+{# Ожидает: field_ctx (FieldRenderContext), url_for #}
+{% if field_ctx.value %}
+    {% set item_id = field_ctx.value %}
+    {% set model_name = field_ctx.extra.relation_model_name %}
+    <a href="#" class="text-gray-800 text-hover-primary"
+       hx-get="{{ url_for('get_view', model_name=model_name, item_id=item_id) }}"
+       hx-target="#main-content-area"
+       hx-push-url="/{{ model_name | lower }}s/{{ item_id }}">
+        {{ item_id }} {# TODO: Отображать имя, если доступно #}
+    </a>
+{% else %}
+    <span class="text-muted">-</span>
+{% endif %}

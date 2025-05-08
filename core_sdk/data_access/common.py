@@ -6,7 +6,9 @@ from typing import Optional
 from starlette.requests import Request
 # fastapi.Depends не используется напрямую в этом файле, но может быть нужен вызывающему коду.
 # Если он здесь не нужен, его можно убрать. Пока оставим, т.к. get_dam_factory его использует.
-from fastapi import Depends
+from fastapi import Depends, FastAPI
+
+from exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__) # Имя будет core_sdk.data_access.common
 
@@ -30,48 +32,46 @@ async def get_optional_token(request: Request) -> Optional[str]:
 _global_http_client: Optional[httpx.AsyncClient] = None
 
 @contextlib.asynccontextmanager
-async def global_http_client_lifespan():
+async def app_http_client_lifespan(app: FastAPI): # Принимает app
     """
-    Manages the lifecycle of a global httpx.AsyncClient instance.
-    Intended to be used as a lifespan context manager in a FastAPI application.
+    Manages the lifecycle of an httpx.AsyncClient instance stored in app.state.
+    Intended to be used as part of a FastAPI lifespan context manager.
     """
-    global _global_http_client
-    if _global_http_client is None:
-        logger.info("SDK: Initializing global HTTP client...")
-        timeouts = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
-        limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
-        try:
-            _global_http_client = httpx.AsyncClient(timeout=timeouts, limits=limits)
-            logger.info("SDK: Global HTTP client initialized successfully.")
-        except Exception as e:
-            logger.critical("SDK: Failed to initialize global HTTP client.", exc_info=True)
-            # Если клиент не удалось создать, это критично для удаленных DAM.
-            # Приложение может решить не стартовать или работать в ограниченном режиме.
-            # Здесь мы просто логируем и позволяем приложению решить.
-            # raise ConfigurationError("Failed to initialize global HTTP client") from e # Раскомментировать, если это должно останавливать запуск
-    else:
-        logger.info("SDK: Global HTTP client already initialized. Skipping re-initialization.")
-
+    logger.info("SDK: Initializing HTTP client in app.state...")
+    timeouts = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0)
+    limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
+    client = None # Локальная переменная
     try:
-        yield
+        client = httpx.AsyncClient(timeout=timeouts, limits=limits)
+        app.state.http_client = client # Сохраняем в app.state
+        logger.info("SDK: HTTP client initialized successfully in app.state.")
+        yield # Приложение работает
+    except Exception as e:
+        logger.critical("SDK: Failed to initialize HTTP client.", exc_info=True)
+        # Можно выбросить ошибку, чтобы остановить старт, если клиент критичен
+        # raise RuntimeError("Failed to initialize HTTP client") from e
     finally:
-        client_to_close = _global_http_client
-        _global_http_client = None # Сбрасываем ссылку перед закрытием
-        if client_to_close:
-            logger.info("SDK: Closing global HTTP client...")
-            try:
-                await client_to_close.aclose()
-                logger.info("SDK: Global HTTP client closed successfully.")
-            except Exception as e:
-                logger.error("SDK: Error closing global HTTP client.", exc_info=True)
+        if client: # Используем локальную переменную client
+            logger.info("SDK: Closing HTTP client from app.state...")
+            await client.aclose()
+            app.state.http_client = None # Очищаем состояние
+            logger.info("SDK: HTTP client closed successfully.")
         else:
-            logger.info("SDK: No global HTTP client instance was active to close.")
+             app.state.http_client = None # На всякий случай очищаем
+             logger.info("SDK: No HTTP client instance was active in app.state to close.")
 
-def get_global_http_client() -> Optional[httpx.AsyncClient]:
+async def get_http_client_from_state(request: Request) -> Optional[httpx.AsyncClient]:
+    """
+    FastAPI dependency to get the httpx.AsyncClient from app.state.
+    """
+    client = getattr(request.app.state, "http_client", None)
+    if client is None:
+         logger.warning("SDK Dependency: HTTP client not found in app.state.")
+    return client
+
+async def get_global_http_client(request: Request) -> Optional[httpx.AsyncClient]:
     """
     Returns the global httpx.AsyncClient instance.
-    Returns None if the client has not been initialized or has been closed.
+    This function is not intended to be used directly in FastAPI routes.
     """
-    if _global_http_client is None:
-        logger.warning("SDK: Attempted to get global HTTP client, but it's not initialized or already closed.")
-    return _global_http_client
+    return await get_http_client_from_state(request)

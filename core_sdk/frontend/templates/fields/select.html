@@ -1,0 +1,30 @@
+{# Ожидает: field_ctx (FieldRenderContext с options) #}
+<div class="mb-5 fv-row">
+    <label for="{{ field_ctx.html_id }}" class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}">
+        {{ field_ctx.label }}
+    </label>
+    <select class="form-select form-select-solid {% if field_ctx.errors %}is-invalid{% endif %}"
+            data-control="select2" {# Атрибут для инициализации Select2 JS #}
+            data-placeholder="Выберите..."
+            data-hide-search="{{ 'true' if (field_ctx.options | length) < 10 else 'false' }}" {# Скрывать поиск для коротких списков #}
+            id="{{ field_ctx.html_id }}"
+            name="{{ field_ctx.html_name }}"
+            {% if field_ctx.is_readonly %}disabled{% endif %}
+            {% if field_ctx.is_required %}required{% endif %}
+            aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors">
+        <option></option> {# Пустая опция для placeholder #}
+        {% for value, label in field_ctx.options %}
+            <option value="{{ value }}" {% if value == field_ctx.value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+
+    {% if field_ctx.description %}
+        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
+    {% endif %}
+
+    {% if field_ctx.errors %}
+        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback mt-1">
+            {{ field_ctx.errors | join(', ') }}
+        </div>
+    {% endif %}
+</div>

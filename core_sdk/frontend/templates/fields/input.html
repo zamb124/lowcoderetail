@@ -1,0 +1,15 @@
+<div class="mb-3">
+    <label for="{{ field_ctx.html_id }}" class="form-label">{{ field_ctx.label }}</label>
+    <input type="{{ 'number' if field_ctx.field_type == 'number' else 'text' }}"
+           class="form-control"
+           id="{{ field_ctx.html_id }}"
+           name="{{ field_ctx.html_name }}"
+           value="{{ field_ctx.value or '' }}"
+           {% if field_ctx.is_readonly %}readonly{% endif %}
+           {% if field_ctx.is_required %}required{% endif %}
+           aria-describedby="{{ field_ctx.html_id }}_help">
+    {% if field_ctx.description %}
+        <div id="{{ field_ctx.html_id }}_help" class="form-text">{{ field_ctx.description }}</div>
+    {% endif %}
+     {# Отображение ошибок валидации #}
+</div>

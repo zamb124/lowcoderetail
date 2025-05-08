@@ -1,0 +1,61 @@
+{# core_sdk/frontend/templates/components/_modal_wrapper.html #}
+{# Базовый шаблон для модальных окон Bootstrap 5 #}
+{# Ожидает: modal_id #}
+{# Блоки: modal_title, modal_body, modal_footer, modal_size #}
+<div class="modal fade" tabindex="-1" id="{{ modal_id }}">
+    <div class="modal-dialog {% block modal_size %}modal-lg{% endblock %} modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{% block modal_title %}Модальное окно{% endblock %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% block modal_body %}
+                    Содержимое модального окна...
+                {% endblock %}
+            </div>
+            {% block modal_footer %}
+            {# Пример футера
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary">Сохранить</button>
+            </div>
+            #}
+            {% endblock %}
+        </div>
+    </div>
+</div>
+{# Скрипт для показа модального окна после загрузки через HTMX #}
+{# Этот скрипт должен быть в ответе HTMX, который загружает модалку #}
+<script>
+    (function() {
+        const modalElement = document.getElementById('{{ modal_id }}');
+        if (modalElement) {
+            // Удаляем предыдущую модалку с таким же ID, если она осталась
+            const existingModal = bootstrap.Modal.getInstance(modalElement);
+            if (existingModal) {
+                existingModal.hide(); // Скрываем, если была показана
+                // Bootstrap сам удалит backdrop при dispose
+            }
+
+            const modal = new bootstrap.Modal(modalElement);
+            // Удаляем модалку из DOM после закрытия, чтобы избежать дубликатов
+            modalElement.addEventListener('hidden.bs.modal', event => {
+                 modal.dispose(); // Уничтожаем экземпляр Bootstrap
+                 modalElement.remove(); // Удаляем из DOM
+                 // Убедимся, что backdrop удален, если он остался
+                 const backdrop = document.querySelector('.modal-backdrop');
+                 if (backdrop) {
+                     backdrop.remove();
+                 }
+                 // Убираем класс с body, если он остался
+                 document.body.style.overflow = '';
+                 document.body.style.paddingRight = '';
+                 document.body.classList.remove('modal-open');
+            }, { once: true }); // Выполнить только один раз
+            modal.show();
+        } else {
+            console.error("Modal element #{{ modal_id }} not found after HTMX swap.");
+        }
+    })();
+</script>

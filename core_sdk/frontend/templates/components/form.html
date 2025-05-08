@@ -1,0 +1,80 @@
+{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
+{# Определяем URL и метод для формы #}
+{% set form_action_url = url_for('update_item', model_name=ctx.model_name, item_id=ctx.item_id) if ctx.mode == 'edit' else url_for('create_item', model_name=ctx.model_name) %}
+{% set form_method = 'put' if ctx.mode == 'edit' else 'post' %}
+{# Цель для HTMX - заменяем саму форму или родительский элемент #}
+{% set hx_target_id = ctx.extra.get('hx_target', '#' + ctx.html_id) %}
+{% set hx_swap_method = ctx.extra.get('hx_swap', 'outerHTML') %}
+
+<form id="{{ ctx.html_id }}"
+      hx-{{ form_method }}="{{ form_action_url }}"
+      hx-target="{{ hx_target_id }}"
+      hx-swap="{{ hx_swap_method }}"
+      class="card shadow-sm"
+      ui_key="{{ ctx.model_name }}--{{ ctx.item_id if ctx.item_id else 'new' }}"
+      data-lsn="{{ ctx.item.lsn if ctx.item and ctx.item.lsn else '0' }}"> {# LSN для optimistic UI, если нужно #}
+
+    <div class="card-header">
+        <h3 class="card-title">{{ ctx.title }}</h3>
+         <div class="card-toolbar">
+             {# Кнопка отмены загружает режим просмотра #}
+             {% if ctx.mode == 'edit' %}
+             <button type="button" class="btn btn-sm btn-light"
+                     hx-get="{{ url_for('get_view', model_name=ctx.model_name, item_id=ctx.item_id) }}"
+                     hx-target="#{{ ctx.html_id }}"
+                     hx-swap="outerHTML">
+                 Отмена
+             </button>
+             {% else %} {# Кнопка отмены для формы создания может закрыть модалку или очистить форму #}
+              <button type="button" class="btn btn-sm btn-light"
+                      hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}" {# Пример: возврат к списку #}
+                      hx-target="#main-content-area"
+                      hx-push-url="/{{ ctx.model_name | lower }}s">
+                 Отмена
+             </button>
+             {% endif %}
+         </div>
+    </div>
+    <div class="card-body">
+        {# Отображение общих ошибок формы #}
+        {% if ctx.errors and ctx.errors._form %}
+            <div class="alert alert-danger d-flex align-items-center p-5 mb-10">
+                <i class="ki-duotone ki-information-5 fs-2hx text-danger me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                <div class="d-flex flex-column">
+                    <h4 class="mb-1 text-danger">Ошибка сохранения</h4>
+                    <span>{{ ctx.errors._form | join('<br>') | safe }}</span>
+                </div>
+            </div>
+        {% endif %}
+
+        {# Отображение полей в режиме редактирования/создания #}
+        {% for field_ctx in ctx.fields %}
+             {# Передаем ошибки конкретного поля в его контекст #}
+             {% set field_errors = ctx.errors.get(field_ctx.name) if ctx.errors else None %}
+             {% set field_ctx_with_errors = field_ctx.model_copy(update={'errors': field_errors}) %}
+             {% include field_ctx.template_path with {'field_ctx': field_ctx_with_errors} %} {# template_path уже содержит путь к _input.html #}
+        {% endfor %}
+    </div>
+    <div class="card-footer d-flex justify-content-end py-6 px-9">
+        {# Кнопка отмены (дублируется для удобства, можно скрыть одну из них стилями) #}
+         {% if ctx.mode == 'edit' %}
+         <button type="button" class="btn btn-light btn-active-light-primary me-2"
+                 hx-get="{{ url_for('get_view', model_name=ctx.model_name, item_id=ctx.item_id) }}"
+                 hx-target="#{{ ctx.html_id }}"
+                 hx-swap="outerHTML">Отмена</button>
+         {% else %}
+          <button type="button" class="btn btn-light btn-active-light-primary me-2"
+                  hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}" {# Пример: возврат к списку #}
+                  hx-target="#main-content-area"
+                  hx-push-url="/{{ ctx.model_name | lower }}s">
+             Отмена
+         </button>
+         {% endif %}
+        <button type="submit" class="btn btn-primary">
+             <span class="indicator-label">Сохранить</span>
+             <span class="indicator-progress">Пожалуйста, подождите...
+                 <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+             </span>
+        </button>
+    </div>
+</form>

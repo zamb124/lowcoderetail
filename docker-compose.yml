@@ -41,15 +41,15 @@ services:
   # --- Core Service (API) ---
   core:
     build:
-      context: ./core
+      context: ./apps/core
       dockerfile: Dockerfile
     container_name: egrocery_core_api # Переименовано для ясности
     env_file:
-      - ./core/.env
+      - ./apps/core/.env
     volumes:
       # Монтируем код для live reload в режиме разработки
       # В production используйте образ с уже скопированным кодом
-      - ./core:/app # Монтируем всю директорию core в /app контейнера
+      - ./apps/core:/app # Монтируем всю директорию core в /app контейнера
       # - ./core/app:/app/app # Старый вариант, может быть менее удобен
       # - ./core/core_sdk:/app/core_sdk # Старый вариант
     ports:
@@ -63,7 +63,7 @@ services:
         condition: service_healthy
     # Команда для запуска API с Uvicorn
     # Для production используйте Gunicorn + Uvicorn workers
-    command: uvicorn core.app.main:app --host 0.0.0.0 --port 8000 --reload # Оставляем reload для разработки
+    command: uvicorn apps.core.app.main:app --host 0.0.0.0 --port 8000 --reload # Оставляем reload для разработки
     restart: unless-stopped # Добавлено для перезапуска API при сбоях
 
   # --- Core Service (Worker) ---
@@ -73,11 +73,11 @@ services:
       dockerfile: Dockerfile
     container_name: egrocery_core_worker
     env_file:
-      - ./core/.env # Используем те же переменные окружения
+      - ./apps/core/.env # Используем те же переменные окружения
     volumes:
       # Монтируем код для live reload в режиме разработки
       # В production используйте образ с уже скопированным кодом
-      - ./core:/app # Монтируем всю директорию core в /app контейнера
+      - ./apps/core:/app # Монтируем всю директорию core в /app контейнера
     networks:
       - egrocery-net
     depends_on:
@@ -121,29 +121,6 @@ services:
     #   core:
     #     condition: service_started
   # --- WMS Service ---
-  wms:
-    build:
-      context: ./wms
-      dockerfile: Dockerfile
-    container_name: egrocery_wms
-    env_file:
-      - ./wms/.env
-    volumes:
-      # Монтируем код для live reload в режиме разработки
-      - ./wms:/app # Монтируем всю директорию wms в /app контейнера
-    ports:
-      - "8001:8001"
-    networks:
-      - egrocery-net
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      core: # WMS может зависеть от Core API
-        condition: service_started # Достаточно, чтобы core API начал запускаться
-    command: uvicorn wms.app.main:app --host 0.0.0.0 --port 8001 --reload
-    restart: unless-stopped
 
 # --- Сети ---
 networks:

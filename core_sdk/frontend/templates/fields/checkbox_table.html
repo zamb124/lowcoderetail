@@ -1,0 +1,6 @@
+{# Ожидает: field_ctx (FieldRenderContext) #}
+{% if field_ctx.value %}
+    <i class="ki-duotone ki-check-circle fs-2 text-success"><span class="path1"></span><span class="path2"></span></i>
+{% else %}
+     <i class="ki-duotone ki-cross-circle fs-2 text-danger"><span class="path1"></span><span class="path2"></span></i>
+{% endif %}

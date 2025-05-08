@@ -20,7 +20,8 @@ from core_sdk.middleware.auth import AuthMiddleware
 from core_sdk.middleware.middleware import DBSessionMiddleware
 from core_sdk.config import BaseAppSettings
 from core_sdk.exceptions import CoreSDKError, ConfigurationError
-from core_sdk.data_access import DataAccessManagerFactory, BaseDataAccessManager, global_http_client_lifespan
+from core_sdk.data_access import DataAccessManagerFactory, BaseDataAccessManager, app_http_client_lifespan
+from data_access.common import app_http_client_lifespan
 
 logger = logging.getLogger("core_sdk.app_setup")
 
@@ -52,7 +53,7 @@ async def sdk_lifespan_manager(
     async with AsyncExitStack() as stack:
         if manage_http_client:
             try:
-                await stack.enter_async_context(global_http_client_lifespan())
+                await stack.enter_async_context(app_http_client_lifespan(app))
                 logger.info("SDK Lifespan: Entered global_http_client_lifespan context.")
             except Exception as e:
                 logger.critical("SDK Lifespan: Failed to enter global_http_client_lifespan context.", exc_info=True)

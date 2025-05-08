@@ -1,0 +1,26 @@
+{# Ожидает: field_ctx (FieldRenderContext) #}
+{# Используем datetime-local, требует формат YYYY-MM-DDTHH:MM #}
+{% set dt_value = field_ctx.value.strftime('%Y-%m-%dT%H:%M') if field_ctx.value else '' %}
+<div class="mb-5 fv-row">
+    <label for="{{ field_ctx.html_id }}" class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}">
+        {{ field_ctx.label }}
+    </label>
+    <input type="datetime-local"
+           class="form-control form-control-solid {% if field_ctx.errors %}is-invalid{% endif %}"
+           id="{{ field_ctx.html_id }}"
+           name="{{ field_ctx.html_name }}"
+           value="{{ dt_value }}"
+           {% if field_ctx.is_readonly %}readonly disabled{% endif %}
+           {% if field_ctx.is_required %}required{% endif %}
+           aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors">
+
+    {% if field_ctx.description %}
+        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
+    {% endif %}
+
+    {% if field_ctx.errors %}
+        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback mt-1">
+            {{ field_ctx.errors | join(', ') }}
+        </div>
+    {% endif %}
+</div>

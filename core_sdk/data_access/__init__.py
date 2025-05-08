@@ -4,7 +4,7 @@
 from .base_manager import BaseDataAccessManager
 from .remote_manager import RemoteDataAccessManager
 from .manager_factory import DataAccessManagerFactory, get_dam_factory # Переименовали зависимость
-from .common import get_optional_token, get_global_http_client, global_http_client_lifespan
+from .common import get_optional_token, get_global_http_client, app_http_client_lifespan
 
 __all__ = [
     "BaseDataAccessManager",
@@ -13,5 +13,5 @@ __all__ = [
     "get_dam_factory",
     "get_optional_token",
     "get_global_http_client",
-    "global_http_client_lifespan",
+    "app_http_client_lifespan",
 ]

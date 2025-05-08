@@ -1,0 +1,23 @@
+{# Ожидает: field_ctx (FieldRenderContext), url_for #}
+<div class="mb-3 row">
+    <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
+    <div class="col-lg-8">
+        {% if field_ctx.value %}
+            {# Предполагаем, что value это ID связанного объекта #}
+            {# TODO: Отображать имя связанного объекта, если оно доступно #}
+            {% set item_id = field_ctx.value %}
+            {% set model_name = field_ctx.extra.relation_model_name %}
+            <a href="#" class="fw-bold text-primary text-hover-warning"
+               hx-get="{{ url_for('get_view', model_name=model_name, item_id=item_id) }}"
+               hx-target="#main-content-area"
+               hx-push-url="/{{ model_name | lower }}s/{{ item_id }}">
+                {{ item_id }} {# Отображаем ID, в идеале нужно имя #}
+            </a>
+        {% else %}
+            <span class="text-muted">Не указано</span>
+        {% endif %}
+         {% if field_ctx.description %}
+            <p class="text-muted fs-7 mt-1">{{ field_ctx.description }}</p>
+         {% endif %}
+    </div>
+</div>

@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "core-service"
+version = "0.1.0"
+description = "Core service for the eGrocery platform"
+# readme = "README.md" # Убедитесь, что файл core/README.md существует или закомментируйте
+requires-python = ">=3.10"
+license = "MIT" # Исправлено на строку
+authors = [
+    {name = "Your Name", email = "your.email@example.com"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: FastAPI",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # ... ваши зависимости ...
+    "fastapi>=0.110.0",
+    "sqlmodel>=0.0.16",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "asyncpg>=0.29.0",
+    "psycopg[binary]>=3.1.0",
+    "redis[hiredis]>=5.0.0",
+    "taskiq>=0.11.0",
+    "taskiq-redis>=0.2.0",
+    "babel>=2.14.0",
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "httpx>=0.27.0",
+    "email-validator>=2.0.0",
+    "babel>=2.14.0",
+    "pycountry>=24.6.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.3.0",
+    "mypy>=1.9.0",
+    "httpx>=0.27.0",
+    "alembic>=1.13.0",
+]
+
+
+[tool.setuptools.packages.find]
+include = ["core_sdk", "core_sdk.*"] # Включить только core_sdk
+# exclude = ["app", "app.*", "tests", "tests.*"] # Можно добавить для явности
+namespaces = false
+# --- КОНЕЦ НОВОГО РАЗДЕЛА ---
+
+[tool.ruff]
+line-length = 120
+
+[tool.mypy]
+
+[tool.pytest.ini_options]

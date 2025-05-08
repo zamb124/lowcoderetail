@@ -1,0 +1,172 @@
+{# apps/frontend/templates/components/_header.html #}
+<header class="pc-header">
+    <div class="header-wrapper">
+        <!-- [Mobile Media Block] start -->
+        <div class="me-auto pc-mob-drp">
+            <ul class="list-unstyled">
+                <!-- Menu collapse Icon (Sidebar Hide) -->
+                <li class="pc-h-item pc-sidebar-collapse">
+                    <a href="#" class="pc-head-link ms-0" id="sidebar-hide">
+                        <i data-feather="menu"></i>
+                    </a>
+                </li>
+                <!-- Mobile Menu Open Icon -->
+                <li class="pc-h-item pc-sidebar-popup">
+                    <a href="#" class="pc-head-link ms-0" id="mobile-collapse">
+                        <i data-feather="menu"></i>
+                    </a>
+                </li>
+                <!-- Search Dropdown -->
+                <li class="dropdown pc-h-item">
+                    <a
+                        class="pc-head-link dropdown-toggle arrow-none m-0 trig-drp-search"
+                        data-bs-toggle="dropdown"
+                        href="#"
+                        role="button"
+                        aria-haspopup="false"
+                        aria-expanded="false"
+                    >
+                        <i data-feather="search"></i>
+                    </a>
+                    <div class="dropdown-menu pc-h-dropdown drp-search">
+                        <form class="px-3 py-2">
+                            <input type="search" class="form-control border-0 shadow-none" placeholder="Search here. . ." />
+                        </form>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <!-- [Mobile Media Block end] -->
+
+        <div class="ms-auto">
+            <ul class="list-unstyled">
+                <!-- Layout Switcher -->
+                <li class="dropdown pc-h-item">
+                    <a
+                        class="pc-head-link dropdown-toggle arrow-none me-0"
+                        data-bs-toggle="dropdown"
+                        href="#"
+                        role="button"
+                        aria-haspopup="false"
+                        aria-expanded="false"
+                    >
+                        <i data-feather="layout"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
+                        <a href="#" class="dropdown-item layout-switcher" data-layout="vertical">
+                            <i data-feather="sidebar"></i> <span>Vertical</span>
+                        </a>
+                        <a href="#" class="dropdown-item layout-switcher" data-layout="horizontal">
+                             <i data-feather="layout"></i> <span>Horizontal</span>
+                        </a>
+                        {# Убраны Compact и Tab #}
+                    </div>
+                </li>
+
+                <!-- Theme Switcher -->
+                <li class="dropdown pc-h-item">
+                     <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="false" aria-expanded="false">
+                        <i data-feather="sun"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
+                        <a href="#" class="dropdown-item theme-switcher" data-theme="dark"> <i data-feather="moon"></i> <span>Dark</span> </a>
+                        <a href="#" class="dropdown-item theme-switcher" data-theme="light"> <i data-feather="sun"></i> <span>Light</span> </a>
+                        <a href="#" class="dropdown-item theme-switcher" data-theme="default"> <i data-feather="settings"></i> <span>Default</span> </a>
+                    </div>
+                </li>
+
+                <!-- Language Switcher -->
+                <li class="dropdown pc-h-item d-none d-md-inline-flex">
+                    <a class="pc-head-link head-link-primary dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="false" aria-expanded="false">
+                        <i data-feather="globe"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end pc-h-dropdown lng-dropdown">
+                        <a href="#" class="dropdown-item" data-lng="en"> <span>English <small>(UK)</small></span> </a>
+                        <a href="#" class="dropdown-item" data-lng="ru"> <span>Русский <small>(RU)</small></span> </a>
+                    </div>
+                </li>
+
+                 <!-- Settings Dropdown -->
+                <li class="dropdown pc-h-item">
+                    <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="false" aria-expanded="false">
+                        <i data-feather="settings"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-end pc-h-dropdown">
+                        <a href="#" class="dropdown-item"> <i class="ti ti-user"></i> <span>My Account</span> </a>
+                        <a href="#" class="dropdown-item"> <i class="ti ti-settings"></i> <span>Settings</span> </a>
+                        <a href="#" class="dropdown-item"> <i class="ti ti-headset"></i> <span>Support</span> </a>
+                        <a href="#" class="dropdown-item"> <i class="ti ti-lock"></i> <span>Lock Screen</span> </a>
+                    </div>
+                </li>
+
+                <!-- Notifications Dropdown -->
+                <li class="dropdown pc-h-item">
+                    <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="false" aria-expanded="false">
+                        <i data-feather="bell"></i>
+                        <span class="badge bg-success pc-h-badge">3</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-notification dropdown-menu-end pc-h-dropdown">
+                        <div class="dropdown-header d-flex align-items-center justify-content-between"> <h5 class="m-0">Notifications</h5> <a href="#" class="btn btn-link btn-sm">Mark all read</a> </div>
+                        <div class="dropdown-body text-wrap header-notification-scroll position-relative" style="max-height: calc(100vh - 215px)">
+                             <p class="text-span">Today</p> <div class="card mb-0"> <div class="card-body">...</div> </div>
+                             <p class="text-span">Yesterday</p> <div class="card mb-0"> <div class="card-body">...</div> </div>
+                        </div>
+                        <div class="text-center py-2"> <a href="#" class="link-danger">Clear all Notifications</a> </div>
+                    </div>
+                </li>
+
+                <!-- User Profile Dropdown -->
+                {% if user %}
+                <li class="dropdown pc-h-item header-user-profile">
+                     <a class="pc-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#" role="button" aria-haspopup="false" data-bs-auto-close="outside" aria-expanded="false">
+                        <i data-feather="user"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-user-profile dropdown-menu-end pc-h-dropdown p-0 overflow-hidden">
+                        <div class="dropdown-header d-flex align-items-center justify-content-between bg-primary">
+                            <div class="d-flex my-2">
+                                <div class="flex-grow-1 ms-3">
+                                    <h6 class="text-white mb-1">{{ user.email or user.id }}</h6>
+                                    <span class="text-white text-opacity-75">{{ 'Superuser' if user.is_superuser else 'User' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="dropdown-body">
+                            <div class="profile-notification-scroll position-relative" style="max-height: calc(100vh - 225px)">
+                                <div class="d-grid my-2">
+                                    <button class="btn btn-primary"
+                                            hx-post="{{ url_for('handle_logout') }}"
+                                            hx-target="body"
+                                            hx-swap="outerHTML"
+                                            hx-indicator="#logout-indicator">
+                                        <svg class="pc-icon me-2"><use xlink:href="#custom-logout-1-outline"></use></svg>
+                                        Logout
+                                        <span id="logout-indicator" class="spinner-border spinner-border-sm htmx-indicator" style="display: none;"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                {% else %}
+                 <li class="pc-h-item">
+                    <a href="{{ url_for('login_page') }}" class="pc-head-link">
+                        <i data-feather="log-in"></i> Login
+                    </a>
+                 </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+     <script>
+        try { if (typeof feather !== 'undefined') feather.replace(); } catch(e) { console.error("Feather init error", e); }
+        try {
+            var dropdownElementList = [].slice.call(document.querySelectorAll('.header-wrapper [data-bs-toggle="dropdown"]'))
+            var dropdownList = dropdownElementList.map(function (dropdownToggleEl) {
+              if (!bootstrap.Dropdown.getInstance(dropdownToggleEl)) {
+                return new bootstrap.Dropdown(dropdownToggleEl);
+              }
+              return bootstrap.Dropdown.getInstance(dropdownToggleEl);
+            })
+        } catch(e) { console.error("Bootstrap Dropdown init error", e); }
+    </script>
+</header>

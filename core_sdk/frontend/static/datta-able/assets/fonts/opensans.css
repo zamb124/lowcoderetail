@@ -1,0 +1,36 @@
+/* apps/frontend/static/css/fonts.css */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url('../fonts/open-sans/OpenSans-VariableFont_wdth,wght.ttf') format('woff2'),
+       url('../fonts/open-sans/OpenSans-Italic-VariableFont_wdth,wght.ttf') format('woff');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/open-sans/OpenSans-VariableFont_wdth,wght.ttf') format('woff2'),
+       url('../fonts/open-sans/OpenSans-Italic-VariableFont_wdth,wght.ttf') format('woff');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/open-sans/OpenSans-VariableFont_wdth,wght.ttf') format('woff2'),
+       url('../fonts/open-sans/OpenSans-Italic-VariableFont_wdth,wght.ttf') format('woff');
+}
+
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/open-sans/OpenSans-VariableFont_wdth,wght.ttf') format('woff2'),
+       url('../fonts/open-sans/OpenSans-Italic-VariableFont_wdth,wght.ttf') format('woff');
+}

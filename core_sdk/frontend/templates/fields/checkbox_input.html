@@ -1,0 +1,27 @@
+{# Ожидает: field_ctx (FieldRenderContext) #}
+<div class="mb-5 fv-row">
+    <div class="form-check form-check-custom form-check-solid">
+        {# Скрытое поле для отправки 'false', если чекбокс не отмечен #}
+        <input type="hidden" name="{{ field_ctx.html_name }}" value="false">
+        <input class="form-check-input" type="checkbox"
+               value="true" {# Значение, отправляемое при отметке #}
+               id="{{ field_ctx.html_id }}"
+               name="{{ field_ctx.html_name }}"
+               {% if field_ctx.value %}checked{% endif %}
+               {% if field_ctx.is_readonly %}disabled{% endif %}
+               aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors"
+               />
+        <label class="form-check-label fw-semibold" for="{{ field_ctx.html_id }}">
+            {{ field_ctx.label }}
+            {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
+        </label>
+    </div>
+     {% if field_ctx.description %}
+        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
+    {% endif %}
+     {% if field_ctx.errors %}
+        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback d-block mt-1"> {# d-block нужен для показа #}
+            {{ field_ctx.errors | join(', ') }}
+        </div>
+    {% endif %}
+</div>
