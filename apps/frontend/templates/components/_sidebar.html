@@ -31,7 +31,7 @@
                 {% if user and user.has_permission('users:view') %} {# Проверка прав #}
                     <li class="pc-item">
                         <a href="#" class="pc-link"
-                           hx-get="{{ url_for('get_list_view', model_name='User') }}"
+                           hx-get="{{ url_for('get_list_view', model_name='user') }}"
                            hx-target="#main-content-area"
                            hx-swap="innerHTML"
                            hx-push-url="/users"> {# Пример URL для списка #}
@@ -130,36 +130,24 @@
         </div>
     </div>
     {# Инициализация Feather Icons после загрузки сайдбара #}
-    <script>feather.replace();</script>
     <script>
-        try {
-            if (typeof feather !== 'undefined') feather.replace();
-        } catch (e) {
-            console.error("Feather init error in sidebar", e);
-        }
-        // Инициализация SimpleBar
+        try { if (typeof feather !== 'undefined') feather.replace(); } catch(e) { console.error("Feather init error in sidebar", e); }
         const sidebarContentEl = document.querySelector('.pc-sidebar .navbar-content');
         if (sidebarContentEl && typeof SimpleBar !== 'undefined' && !SimpleBar.instances.has(sidebarContentEl)) {
-            try {
-                new SimpleBar(sidebarContentEl);
-            } catch (e) {
-                console.error("Simplebar init error in sidebar", e);
-            }
+            try { new SimpleBar(sidebarContentEl); } catch(e) { console.error("Simplebar init error in sidebar", e); }
         }
         // Инициализация кликов по меню
-        if (window.app && typeof window.app._initMenuClicks === 'function') {
-            // Даем DOM немного времени на отрисовку после htmx:afterSwap
-            setTimeout(() => {
-                const sidebarNav = document.querySelector('.pc-sidebar .pc-navbar');
-                if (sidebarNav) {
-                    console.debug("Initializing menu clicks inside sidebar...");
-                    window.app._initMenuClicks(sidebarNav); // Вызываем метод глобального объекта
-                } else {
-                    console.warn("Sidebar .pc-navbar not found for menu click initialization.");
-                }
-            }, 50); // Небольшая задержка
+        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+        if (window.app && window.app.themeManager && typeof window.app.themeManager._initMenuClicks === 'function') {
+             setTimeout(() => {
+                 const sidebarNav = document.querySelector('.pc-sidebar .pc-navbar');
+                 if (sidebarNav) {
+                     console.debug("Initializing menu clicks inside sidebar via ThemeManager...");
+                     window.app.themeManager._initMenuClicks(sidebarNav); // Вызываем метод из ThemeManager
+                 } else { console.warn("Sidebar .pc-navbar not found for menu click initialization."); }
+             }, 100); // Немного увеличил задержку для надежности
         } else {
-            console.error("window.app or window.app._initMenuClicks is not available for sidebar init.");
+             console.error("window.app.themeManager or window.app.themeManager._initMenuClicks is not available for sidebar init.");
         }
     </script>
 </nav>

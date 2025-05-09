@@ -1,50 +1,52 @@
 {# core_sdk/frontend/templates/fields/_input_inline.html #}
 {# Ожидает: field_ctx, item_id, model_name, request, url_for #}
 {% set input_type = 'text' %}
+{% set current_value = field_ctx.value %} {# Используем отдельную переменную для значения #}
+
 {% if field_ctx.field_type == 'number' %}
     {% set input_type = 'number' %}
 {% elif field_ctx.field_type == 'datetime' %}
      {% set input_type = 'datetime-local' %}
-     {% set value = field_ctx.value.strftime('%Y-%m-%dT%H:%M') if field_ctx.value else '' %}
+     {% set current_value = field_ctx.value.strftime('%Y-%m-%dT%H:%M') if field_ctx.value and hasattr(field_ctx.value, 'strftime') else '' %}
 {% elif field_ctx.field_type == 'date' %}
      {% set input_type = 'date' %}
-     {% set value = field_ctx.value.strftime('%Y-%m-%d') if field_ctx.value else '' %}
+     {% set current_value = field_ctx.value.strftime('%Y-%m-%d') if field_ctx.value and hasattr(field_ctx.value, 'strftime') else '' %}
 {% elif field_ctx.field_type == 'time' %}
      {% set input_type = 'time' %}
-     {% set value = field_ctx.value.strftime('%H:%M') if field_ctx.value else '' %}
+     {% set current_value = field_ctx.value.strftime('%H:%M') if field_ctx.value and hasattr(field_ctx.value, 'strftime') else '' %}
 {% elif field_ctx.field_type == 'email' %}
      {% set input_type = 'email' %}
 {% elif field_ctx.field_type == 'url' %}
      {% set input_type = 'url' %}
 {% else %}
-    {% set value = field_ctx.value | default('', true) %}
+    {% set current_value = field_ctx.value | default('', true) %}
 {% endif %}
 
 {# --- Для Checkbox --- #}
 {% if field_ctx.field_type == 'checkbox' %}
 <div class="form-check form-check-custom form-check-solid form-check-sm d-inline-block">
-    {# Скрытое поле для отправки 'false', если чекбокс не отмечен #}
     <input type="hidden" name="{{ field_ctx.html_name }}" value="false">
     <input class="form-check-input" type="checkbox" value="true"
-           id="{{ field_ctx.html_id }}--inline"
+           id="{{ field_ctx.html_id }}--inline-input" {# Уникальный ID для самого инпута #}
            name="{{ field_ctx.html_name }}"
            {% if field_ctx.value %}checked{% endif %}
            {% if field_ctx.is_readonly %}disabled{% endif %}
            hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-           hx-trigger="change" {# Сохранение при изменении #}
-           hx-target="closest td" {# Заменяем родительскую ячейку #}
-           hx-swap="innerHTML" {# Заменяем содержимое на ответ сервера (view-представление) #}
-           hx-indicator="closest td" {# Показываем индикатор внутри ячейки #}
-           >
+           hx-trigger="change"
+           hx-target="closest td"
+           hx-swap="innerHTML"
+           hx-indicator="closest td"
+           {# autofocus для чекбокса может быть не нужен, но не повредит #}
+           autofocus>
 </div>
 {# --- Для Select (Enum) --- #}
 {% elif field_ctx.field_type == 'select' %}
  <select class="form-select form-select-sm form-select-solid {% if field_ctx.errors %}is-invalid{% endif %}"
-        id="{{ field_ctx.html_id }}--inline"
+        id="{{ field_ctx.html_id }}--inline-input" {# Уникальный ID #}
         name="{{ field_ctx.html_name }}"
         {% if field_ctx.is_readonly %}disabled{% endif %}
         hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-        hx-trigger="change" {# Сохранение при изменении #}
+        hx-trigger="change"
         hx-target="closest td" hx-swap="innerHTML" hx-indicator="closest td"
         autofocus>
     {% for opt_value, opt_label in field_ctx.options %}
@@ -55,23 +57,20 @@
 {% else %}
 <input type="{{ input_type }}"
        class="form-control form-control-sm form-control-solid {% if field_ctx.errors %}is-invalid{% endif %}"
-       id="{{ field_ctx.html_id }}--inline" {# Уникальный ID для инлайна #}
+       id="{{ field_ctx.html_id }}--inline-input" {# Уникальный ID #}
        name="{{ field_ctx.html_name }}"
-       value="{{ value }}"
+       value="{{ current_value }}"
        {% if field_ctx.is_readonly %}readonly disabled{% endif %}
        {% if field_ctx.is_required %}required{% endif %}
        placeholder="{{ field_ctx.label }}"
-       {# Сохранение при потере фокуса (blur) или нажатии Enter #}
        hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
        hx-trigger="blur, keyup[key=='Enter']"
-       hx-target="closest td" {# Заменяем родительскую ячейку #}
-       hx-swap="innerHTML" {# Заменяем содержимое на ответ сервера (view-представление) #}
-       hx-indicator="closest td" {# Показываем индикатор внутри ячейки #}
-       autofocus {# Автофокус на поле при появлении #}
-       >
+       hx-target="closest td"
+       hx-swap="innerHTML"
+       hx-indicator="closest td"
+       autofocus>
 {% endif %}
 
-{# Сообщение об ошибке можно показать под полем или в notification #}
 {% if field_ctx.errors %}
     <div class="invalid-feedback d-block mt-1 fs-sm">
         {{ field_ctx.errors | join(', ') }}

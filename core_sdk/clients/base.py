@@ -66,6 +66,8 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
     def _get_auth_headers(self) -> Dict[str, str]:
         """Формирует заголовки авторизации, если присутствует токен."""
         if self.auth_token:
+            if self.auth_token.startswith("Bearer "):
+                return {"Authorization": self.auth_token}
             return {"Authorization": f"Bearer {self.auth_token}"}
         return {}
 
@@ -174,7 +176,8 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
         *, # Делает параметры только именованными для ясности
         cursor: Optional[int] = None,
         limit: int = 50,
-        filters: Optional[Mapping[str, Any]] = None
+        filters: Optional[Mapping[str, Any]] = None,
+        direction: Optional[str] = 'asc'
     ) -> List[ModelType]:
         """
         Получает список объектов с поддержкой курсорной пагинации и фильтрации.
@@ -186,7 +189,7 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
         :return: Список экземпляров `ModelType`.
         :raises ServiceCommunicationError: При ошибках связи или некорректном формате ответа.
         """
-        url = f"{self.api_base_url}/list/"
+        url = f"{self.api_base_url}"
         params: Dict[str, Any] = {"limit": limit}
         if cursor is not None:
             params["cursor"] = cursor
@@ -199,10 +202,15 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
         logger.info(f"Fetching list of items from {url} with params: {params}")
         response = await self._request("GET", url, params=params, allowed_statuses=[200])
         items_data = response.json()
-        if not isinstance(items_data, list):
+        if not isinstance(items_data['items'], list):
              logger.error(f"Invalid response format from {url}: expected a list, got {type(items_data)}")
              raise ServiceCommunicationError(f"Invalid response format from {url}: expected a list, got {type(items_data).__name__}", url=url)
-        return [self.model_cls.model_validate(item) for item in items_data]
+        return {
+            'items': [self.model_cls.model_validate(item) for item in items_data['items']],
+            "next_cursor": items_data.get("next_cursor"),
+            "limit": items_data.get("limit"),
+            "count": items_data.get("count"),
+        }
 
     async def create(self, data: CreateSchemaType) -> ModelType:
         """

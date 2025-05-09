@@ -1,133 +1,156 @@
+version: '3.8'
+
 services:
   # --- База данных PostgreSQL ---
   db:
     image: postgres:15-alpine
-    container_name: egrocery_db
+    container_name: platform_db # Общее имя для БД платформы
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh # Убедитесь, что этот скрипт существует и корректен
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
     environment:
-      POSTGRES_USER: main_user
-      POSTGRES_PASSWORD: main_password # Замените на надежный пароль
-      POSTGRES_DB: main_db
+      POSTGRES_USER: ${POSTGRES_USER:-main_user} # Используем переменные окружения или дефолты
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-main_password}
+      POSTGRES_DB: ${POSTGRES_INIT_DB:-main_db} # База для инициализации, может быть не основной
+      # Переменные для init-db.sh
+      CORE_DB_USER: ${CORE_DB_USER:-core_user}
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:-your_strong_password_core}
+      CORE_DB_NAME: ${CORE_DB_NAME:-core_db}
+      FRONTEND_DB_USER: ${FRONTEND_DB_USER:-frontend_user} # Если frontend-у нужна своя БД (маловероятно)
+      FRONTEND_DB_PASSWORD: ${FRONTEND_DB_PASSWORD:-your_strong_password_frontend}
+      FRONTEND_DB_NAME: ${FRONTEND_DB_NAME:-frontend_db}
+      PURCHASE_DB_USER: ${PURCHASE_DB_USER:-purchase_user}
+      PURCHASE_DB_PASSWORD: ${PURCHASE_DB_PASSWORD:-your_strong_password_purchase}
+      PURCHASE_DB_NAME: ${PURCHASE_DB_NAME:-purchase_db}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     networks:
-      - egrocery-net
+      - platform-net
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ] # $$ для экранирования в docker-compose
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped # Добавлено для перезапуска БД при сбоях
+    restart: unless-stopped
 
   # --- Кэш Redis ---
   redis:
     image: redis:7-alpine
-    container_name: egrocery_redis
+    container_name: platform_redis
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
-      - egrocery-net
+      - platform-net
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped # Добавлено для перезапуска Redis при сбоях
+    restart: unless-stopped
 
-  # --- Core Service (API) ---
+  # --- Core Service (API + Worker) ---
   core:
     build:
-      context: ./apps/core
-      dockerfile: Dockerfile
-    container_name: egrocery_core_api # Переименовано для ясности
+      context: . # Контекст - корень проекта
+      dockerfile: ./apps/core/Dockerfile # Путь к Dockerfile сервиса
+    container_name: platform_core_service
     env_file:
       - ./apps/core/.env
     volumes:
-      # Монтируем код для live reload в режиме разработки
-      # В production используйте образ с уже скопированным кодом
-      - ./apps/core:/app # Монтируем всю директорию core в /app контейнера
-      # - ./core/app:/app/app # Старый вариант, может быть менее удобен
-      # - ./core/core_sdk:/app/core_sdk # Старый вариант
+      # Для разработки: монтируем код для live reload
+      - ./apps/core/app:/app/app
+      - ./core_sdk:/app/core_sdk
+      # Если core должен вызывать другие сервисы, и их схемы не в SDK:
+      # - ./apps/purchase/app/schemas:/app/apps/purchase/app/schemas:ro # Пример
     ports:
-      - "8000:8000"
+      - "${CORE_PORT:-8000}:8000" # Порт для API
     networks:
-      - egrocery-net
+      - platform-net
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Команда для запуска API с Uvicorn
-    # Для production используйте Gunicorn + Uvicorn workers
-    command: uvicorn apps.core.app.main:app --host 0.0.0.0 --port 8000 --reload # Оставляем reload для разработки
-    restart: unless-stopped # Добавлено для перезапуска API при сбоях
+    # Команда для запуска API и Worker (можно разделить на два сервиса, если нужно масштабировать отдельно)
+    # Для простоты пока объединим, но лучше разделить для production
+    command: /start-core.sh # Используем стартовый скрипт
+    restart: unless-stopped
 
-  # --- Core Service (Worker) ---
-  core-worker:
+  # --- Frontend Service (BFF) ---
+  frontend:
     build:
-      context: ./core # Используем тот же контекст и Dockerfile, что и для API
-      dockerfile: Dockerfile
-    container_name: egrocery_core_worker
+      context: .
+      dockerfile: ./apps/frontend/Dockerfile
+    container_name: platform_frontend_bff
     env_file:
-      - ./apps/core/.env # Используем те же переменные окружения
+      - ./apps/frontend/.env
     volumes:
-      # Монтируем код для live reload в режиме разработки
-      # В production используйте образ с уже скопированным кодом
-      - ./apps/core:/app # Монтируем всю директорию core в /app контейнера
+      - ./apps/frontend/app:/app/app
+      - ./core_sdk:/app/core_sdk
+      # Frontend-у нужны схемы Core для ModelRegistry
+      - ./apps/core/app/schemas:/app/apps/core/app/schemas:ro
+      - ./apps/core/app/models:/app/apps/core/app/models:ro # Если модели Core нужны для RemoteConfig
+      # Если frontend вызывает purchase:
+      # - ./apps/purchase/app/schemas:/app/apps/purchase/app/schemas:ro
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
     networks:
-      - egrocery-net
+      - platform-net
+    depends_on:
+      core: # Зависит от API core
+        condition: service_started # Или service_healthy, если у core есть healthcheck API
+      # db и redis могут не быть прямыми зависимостями, если все через core
+    command: uvicorn apps.frontend.app.main:app --host 0.0.0.0 --port 8080 --reload # Используем apps.frontend...
+    restart: unless-stopped
+
+  # --- Purchase Service (API + Worker) ---
+  purchase:
+    build:
+      context: .
+      dockerfile: ./apps/purchase/Dockerfile
+    container_name: platform_purchase_service
+    env_file:
+      - ./apps/purchase/.env
+    volumes:
+      - ./apps/purchase/app:/app/app
+      - ./core_sdk:/app/core_sdk
+      # Если purchase должен вызывать core и его схемы не в SDK:
+      # - ./apps/core/app/schemas:/app/apps/core/app/schemas:ro
+    ports:
+      - "${PURCHASE_PORT:-8002}:8002" # Порт для API
+    networks:
+      - platform-net
     depends_on:
       db:
-        condition: service_healthy # Воркеру нужна БД
+        condition: service_healthy
       redis:
-        condition: service_healthy # Воркеру нужен Redis (для Taskiq)
-      # Не зависит от core API, но может стартовать параллельно или чуть позже
-    # Команда для запуска воркера Taskiq
-    # Используем путь к экземпляру брокера и хуки из worker.py
-    command: >
-      taskiq worker
-      core.app.worker:broker
-      --reload
-      --fs-discover
-      --on-startup core.app.worker:startup
-      --on-shutdown core.app.worker:shutdown
-      # Можно добавить другие опции Taskiq, например, --workers N
-    restart: unless-stopped # Добавлено для перезапуска воркера при сбоях
+        condition: service_healthy
+    command: /start-purchase.sh # Используем стартовый скрипт
+    restart: unless-stopped
+
+  # --- Docs Service ---
   docs:
     build:
-      context: . # Контекст сборки - корень проекта
-      dockerfile: docs/Dockerfile # Указываем наш Dockerfile для документации
-    container_name: egrocery_docs
+      context: .
+      dockerfile: docs/Dockerfile
+    container_name: platform_docs
     ports:
-      - "8099:8000" # Маппим порт 8099 хоста на порт 8000 контейнера (где слушает mkdocs)
+      - "${DOCS_PORT:-8099}:8000"
     volumes:
-      # Монтируем исходники документации для live-reload при изменениях
-      - ./docs:/app/docs_src/docs:ro # :ro (read-only) если не хотите случайных изменений из контейнера
+      - ./docs:/app/docs_src/docs:ro
       - ./mkdocs.yml:/app/docs_src/mkdocs.yml:ro
-      # Монтируем core_sdk, чтобы mkdocstrings видел изменения в docstrings SDK
       - ./core_sdk:/app/docs_src/core_sdk:ro
-      # Если документация зависит от кода других сервисов (маловероятно для mkdocstrings, но возможно)
-      # - ./core:/app/docs_src/core:ro # Пример
+      - ./apps:/app/docs_src/apps:ro # Монтируем все сервисы для mkdocstrings
     networks:
-      - egrocery-net # Та же сеть, что и у других сервисов (не обязательно, но удобно)
+      - platform-net
     restart: unless-stopped
-    # Можно добавить depends_on, если документация должна стартовать после чего-то,
-    # но обычно это независимый сервис.
-    # depends_on:
-    #   core:
-    #     condition: service_started
-  # --- WMS Service ---
 
-# --- Сети ---
 networks:
-  egrocery-net:
+  platform-net:
     driver: bridge
 
-# --- Тома ---
 volumes:
   postgres_data:
     driver: local

@@ -52,7 +52,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
         try:
             self.client = RemoteServiceClient(
                 base_url=remote_config.service_url,
-                # model_endpoint передается в каждый метод клиента, а не в конструктор
+                model_endpoint = model_cls.__tablename__.lower(),
                 model_cls=self.read_schema, # Клиент будет парсить ответы в эту схему
                 auth_token=self.auth_token,
                 http_client=http_client # Используем переданный клиент
@@ -67,7 +67,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
         logger.debug(f"Remote DAM GET: Requesting '{self.read_schema.__name__}' with ID: {item_id} from endpoint '{self.remote_config.model_endpoint}'.")
         try:
             # RemoteServiceClient.get ожидает model_endpoint
-            result = await self.client.get(item_id, model_endpoint=self.remote_config.model_endpoint)
+            result = await self.client.get(item_id)
             if result is None:
                 logger.info(f"Remote DAM GET: Item {item_id} not found (404).")
                 return None
@@ -88,14 +88,15 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
             cursor: Optional[int] = None,
             limit: int = 50,
             filters: Optional[Mapping[str, Any]] = None,
+            direction: Optional[str] = 'asc', # Не используется в RemoteServiceClient
             # order_by не используется стандартным RemoteServiceClient, но может быть в кастомном
             order_by: Optional[List[Any]] = None # pylint: disable=unused-argument
     ) -> List[ModelType]: # Возвращает список, а не словарь с пагинацией как BaseDAM
         logger.debug(f"Remote DAM LIST: Requesting list of '{self.read_schema.__name__}' from endpoint '{self.remote_config.model_endpoint}'. Filters: {filters}, Limit: {limit}, Cursor: {cursor}")
         try:
             results = await self.client.list(
-                model_endpoint=self.remote_config.model_endpoint,
-                cursor=cursor, limit=limit, filters=filters
+                #model_endpoint=self.remote_config.model_endpoint,
+                cursor=cursor, limit=limit, filters=filters, direction=direction,
             )
             # Результат уже список объектов типа self.read_schema
             return cast(List[ModelType], results)
@@ -128,7 +129,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
             raise TypeError(f"Unsupported data type for remote create {self.model.__name__}: {type(data)}. Expected {expected_type_name} or dict.")
 
         try:
-            result = await self.client.create(validated_data, model_endpoint=self.remote_config.model_endpoint)
+            result = await self.client.create(validated_data)
             return cast(ModelType, result)
         except ServiceCommunicationError as e:
             logger.warning(f"Remote DAM CREATE: ServiceCommunicationError. Status: {e.status_code}. Error: {e}", exc_info=True)
@@ -159,7 +160,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
             raise TypeError(f"Unsupported data type for remote update {self.model.__name__}: {type(data)}. Expected {expected_type_name} or dict.")
 
         try:
-            result = await self.client.update(item_id, validated_data, model_endpoint=self.remote_config.model_endpoint)
+            result = await self.client.update(item_id, validated_data)
             return cast(ModelType, result)
         except ServiceCommunicationError as e:
             logger.warning(f"Remote DAM UPDATE: ServiceCommunicationError for ID {item_id}. Status: {e.status_code}. Error: {e}", exc_info=True if e.status_code != 404 else False)
@@ -174,7 +175,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
         logger.debug(f"Remote DAM DELETE: Deleting '{self.model.__name__}' with ID: {item_id} from endpoint '{self.remote_config.model_endpoint}'.")
         try:
             # RemoteServiceClient.delete возвращает bool
-            success = await self.client.delete(item_id, model_endpoint=self.remote_config.model_endpoint)
+            success = await self.client.delete(item_id)
             if success:
                 logger.info(f"Remote DAM DELETE: Item {item_id} deleted successfully (or was already not found).")
             else:

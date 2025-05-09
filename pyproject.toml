@@ -1,0 +1,59 @@
+[tool.poetry]
+name = "platform-monorepo"
+version = "0.1.0"
+description = "Platform Monorepo"
+authors = ["Your Name <you@example.com>"]
+# Пакеты здесь - это общие зависимости для всех или для сборки/тестирования
+packages = [
+    { include = "core_sdk" },
+    # Не указывайте здесь apps/* как пакеты, если они не являются устанавливаемыми библиотеками
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.104.0" # Пример общей зависимости
+uvicorn = {extras = ["standard"], version = "^0.23.2"}
+pydantic = {extras = ["email"], version = "^2.4.2"}
+pydantic-settings = "^2.0.3"
+sqlmodel = "^0.0.14" # Обновлено
+sqlalchemy = "^2.0.22"
+asyncpg = "^0.28.0"
+psycopg2-binary = "^2.9.9" # Для Alembic, если он использует синхронный драйвер
+alembic = "^1.12.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+httpx = "^0.25.0"
+redis = "^5.0.1" # Для RedisAsyncResultBackend и RedisStreamBroker
+taskiq = "^0.9.0"
+taskiq-redis = "^0.4.0"
+fastapi-filter = "^0.7.0" # Обновлено до версии, совместимой с Pydantic v2
+# Зависимости для frontend (BFF)
+jinja2 = "^3.1.2"
+python-multipart = "^0.0.6" # Для форм FastAPI
+# Зависимости для документации
+mkdocs = "^1.5.3"
+mkdocs-material = "^9.4.7"
+mkdocstrings = {extras = ["python"], version = "^0.23.0"}
+# Зависимости для тестов (могут быть в dev-группе)
+pytest = "^7.4.2"
+pytest-asyncio = "^0.21.1"
+
+# Опциональные зависимости для конкретных сервисов (если они не в своих pyproject.toml)
+# Например, если frontend использует redis напрямую (хотя лучше через SDK)
+redis = { version = "^5.0.1", optional = true }
+
+[tool.poetry.extras]
+redis = ["redis"]
+# Добавьте другие группы опциональных зависимостей, если нужно
+
+[tool.poetry.group.dev.dependencies]
+# Зависимости только для разработки
+black = "^23.9.1"
+mypy = "^1.5.1"
+ruff = "^0.1.0"
+pre-commit = "^3.5.0"
+# ... другие dev-зависимости ...
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

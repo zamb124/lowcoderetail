@@ -151,8 +151,7 @@ def create_app_with_sdk_setup(
     after_startup_hook: Optional[Callable[[], Awaitable[None]]] = None,
     before_shutdown_hook: Optional[Callable[[], Awaitable[None]]] = None,
     after_shutdown_hook: Optional[Callable[[], Awaitable[None]]] = None,
-    # --- УБИРАЕМ extra_middleware из параметров ---
-    # extra_middleware: Optional[List[Middleware]] = None,
+    extra_middleware: Optional[List[Middleware]] = None,
     # --- ДОБАВЛЯЕМ параметры для AuthMiddleware ---
     enable_auth_middleware: bool = True, # Включить ли AuthMiddleware
     auth_allowed_paths: Optional[List[str]] = None, # Пути, не требующие аутентификации

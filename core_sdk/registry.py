@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__) # Имя будет core_sdk.registry
 
 # Типы для моделей и схем
 ModelClassType = TypeVar("ModelClassType", bound=SQLModel) # Уточненное имя
-SchemaClassType = TypeVar("SchemaClassType", bound=BaseModel) # Уточненное имя
+SchemaClassType = TypeVar("SchemaClassType", bound=SQLModel) # Уточненное имя
 
 class RemoteConfig(BaseModel):
     """
@@ -178,6 +178,7 @@ class ModelRegistry:
             create_schema_cls: Optional[Type[SchemaClassType]] = None,
             update_schema_cls: Optional[Type[SchemaClassType]] = None,
             read_schema_cls: Optional[Type[ModelClassType]] = None, # Схема для парсинга ответа
+            filter_cls: Optional[Type[ModelClassType]] = None,
             model_name: Optional[str] = None
     ) -> None:
         """
@@ -200,7 +201,7 @@ class ModelRegistry:
             model_cls=model_cls,
             access_config=config,
             manager_cls=Any, # Фабрика создаст RemoteDataAccessManager на основе access_config
-            filter_cls=None, # Фильтры обычно не применяются к удаленным менеджерам напрямую через FastAPI-Filter
+            filter_cls=filter_cls, # Фильтры обычно не применяются к удаленным менеджерам напрямую через FastAPI-Filter
             create_schema_cls=create_schema_cls,
             update_schema_cls=update_schema_cls,
             read_schema_cls=read_schema_cls or model_cls # Если не указана, парсим в model_cls

@@ -45,7 +45,7 @@ print("Copy this hash and use it in the SQL INSERT statement for the 'users' tab
     last_name
 ) VALUES (
     'admin1@example.com',  -- Замените на email вашего администратора
-    'СКОПИРОВАННЫЙ_ХЕШ_ПАРОЛЯ_ИЗ_ШАГА_2', -- Вставьте сюда хеш
+    '$2b$12$bbzSZy8MgOJkuVLhsZSDBeC0BtZRApF.Oan.QUWzvRe5F7VwZObYa', -- Вставьте сюда хеш
     TRUE,                 -- Пользователь активен
     TRUE,                 -- Сделать суперпользователем (ВАЖНО для первого админа)
     'UUID_КОМПАНИИ_ИЗ_ШАГА_1', -- Вставьте сюда UUID компании

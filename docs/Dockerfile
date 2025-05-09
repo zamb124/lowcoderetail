@@ -1,34 +1,27 @@
-# Используем базовый образ Python, на котором работает MkDocs
+# docs/Dockerfile
 FROM python:3.12-slim
 
-# Устанавливаем рабочую директорию
 WORKDIR /app/docs_src
 
-# Копируем только необходимые файлы для сборки документации
-COPY mkdocs.yml mkdocs.yml
-COPY docs/ ./docs/
+# Копируем только необходимые файлы для установки зависимостей документации
+COPY pyproject.toml poetry.lock* /app/docs_src/
 
-# Копируем исходный код core_sdk, так как mkdocstrings будет его анализировать
-# Предполагается, что Dockerfile находится в корне проекта, где core_sdk - поддиректория
-COPY core_sdk/ ./core_sdk/
+# Устанавливаем Poetry и зависимости только для группы 'docs' или 'dev', если там mkdocs
+# Либо устанавливаем mkdocs и плагины напрямую через pip
+RUN pip install poetry==1.7.1 && \
+    poetry config virtualenvs.create false && \
+    poetry install --no-dev --no-interaction --no-ansi --only main,docs # Предполагаем группу [tool.poetry.group.docs.dependencies]
 
-# Устанавливаем MkDocs и необходимые плагины/темы
-# Лучше зафиксировать версии для консистентности сборок
-RUN pip install --no-cache-dir \
-    mkdocs==1.6.1 \
-    mkdocs-material==9.6.12 \
-    mkdocstrings[python]~=0.29.1 \
-    pymdown-extensions~=10.15
+# Если mkdocs и плагины не в poetry, а ставятся отдельно:
+# RUN pip install mkdocs mkdocs-material mkdocstrings mkdocstrings-python
 
-# Открываем порт, на котором MkDocs будет сервировать документацию
+# Копируем весь остальной контент (исходники документации, mkdocs.yml, SDK, приложения)
+# Это нужно, чтобы mkdocstrings мог найти исходный код для генерации документации по docstrings
+COPY . /app/docs_src
+
+WORKDIR /app/docs_src
+
 EXPOSE 8000
 
-# Команда по умолчанию для сборки и запуска сервера MkDocs
-# `mkdocs serve` по умолчанию слушает на 0.0.0.0:8000
-# `--dev-addr 0.0.0.0:8000` явно указывает адрес
-# `--no-livereload` можно добавить, если livereload не нужен в контейнере
+# Команда для запуска mkdocs в режиме разработки (с live reload)
 CMD ["mkdocs", "serve", "--dev-addr", "0.0.0.0:8000"]
-
-# Альтернативная команда, если вы хотите только собрать статику:
-# CMD ["mkdocs", "build", "--site-dir", "/app/docs_site"]
-# В этом случае вам понадобится веб-сервер (например, Nginx) для раздачи /app/docs_site

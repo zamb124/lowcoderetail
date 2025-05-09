@@ -160,8 +160,8 @@ async def test_engine(test_settings: AppSettingsClass):
 # --- Фикстура применения миграций ---
 @pytest_asyncio.fixture(scope="session")
 async def apply_migrations(test_engine: AsyncEngine, test_settings: AppSettingsClass):
-    alembic_cfg_path = os.path.join(project_root, "core/alembic.ini")
-    script_location = os.path.join(project_root, 'core', 'alembic')
+    alembic_cfg_path = os.path.join(project_root, "apps/core/alembic.ini")
+    script_location = os.path.join(project_root, 'apps/core', 'migrations')
 
     # Check for alembic configuration and migration script location
     if not os.path.exists(alembic_cfg_path):

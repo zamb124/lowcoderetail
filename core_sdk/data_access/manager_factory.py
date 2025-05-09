@@ -4,6 +4,7 @@ from typing import Type, Optional, Any, Dict
 
 from fastapi import Depends # Depends используется для get_dam_factory
 import httpx # httpx.AsyncClient используется для type hinting
+from starlette.requests import Request
 
 from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
 from core_sdk.data_access.base_manager import BaseDataAccessManager
@@ -34,7 +35,7 @@ class DataAccessManagerFactory:
         self._manager_cache: Dict[str, BaseDataAccessManager | RemoteDataAccessManager] = {}
         logger.debug(f"DataAccessManagerFactory initialized. HTTP client provided: {http_client is not None}, Auth token provided: {auth_token is not None}")
 
-    def get_manager(self, model_name: str) -> Any: # Возвращаемый тип Any, т.к. это может быть Base или Remote DAM
+    def get_manager(self, model_name: str, request: Request=None) -> Any: # Возвращаемый тип Any, т.к. это может быть Base или Remote DAM
         """
         Возвращает экземпляр DataAccessManager для указанной модели.
         Если менеджер для этой модели уже был создан этой фабрикой, возвращается
@@ -92,11 +93,12 @@ class DataAccessManagerFactory:
                 raise ConfigurationError(f"HTTP client required for remote manager '{model_name}'.")
 
             logger.info(f"Instantiating REMOTE manager for model '{model_name}'.")
+            token = request.headers.get("Authorization") or request.cookies.get("Authorization") if request else self.auth_token
             try:
                 manager_instance = RemoteDataAccessManager(
                     remote_config=access_config,
                     http_client=self.http_client,
-                    auth_token=self.auth_token,
+                    auth_token=token,
                     model_cls=model_info.model_cls,
                     create_schema_cls=model_info.create_schema_cls,
                     update_schema_cls=model_info.update_schema_cls,

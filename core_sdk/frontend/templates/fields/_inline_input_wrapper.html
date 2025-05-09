@@ -1,30 +1,36 @@
 {# core_sdk/frontend/templates/fields/_inline_input_wrapper.html #}
-{# Ожидает: field_ctx, item_id, model_name, request, url_for #}
-{# Обертка для инпута, которая будет заменять содержимое <td> #}
+{# Ожидает: field_ctx, item_id, model_name, request, url_for, item (весь объект) #}
 <div class="inline-edit-wrapper"
-     {# Отмена по нажатию Esc вне поля ввода #}
      hx-trigger="keyup[key=='Escape'] from:body"
      hx-get="{{ url_for('get_table_cell_view', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-     hx-target="closest td" {# Заменяем родительскую ячейку #}
-     hx-swap="innerHTML"
-     >
+     hx-target="closest td"
+     hx-swap="innerHTML">
 
-    {# Включаем основной шаблон инпута, передавая ему контекст #}
-    {# Используем специальный шаблон _input_inline.html или адаптируем _input.html #}
     {% include "fields/_input_inline.html" with context %}
 
-    {# Опционально: кнопки Save/Cancel, если не используется trigger=change/blur #}
-    {# <div class="d-flex justify-content-end mt-1">
-        <button class="btn btn-sm btn-light me-1" type="button"
-                hx-get="{{ url_for('get_table_cell_view', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-                hx-target="closest td" hx-swap="innerHTML">
-            Отмена
-        </button>
-         <button class="btn btn-sm btn-primary" type="button"
-                 hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-                 hx-include="[name='{{ field_ctx.html_name }}']" {# Включаем только значение этого поля #}
-                 hx-target="closest td" hx-swap="innerHTML">
-             Сохранить
-         </button>
-    </div> #}
+    {# Скрипт для установки фокуса после вставки этого блока #}
+    <script>
+      (function() {
+          debugger
+        // Даем HTMX время на вставку, затем фокусируемся
+        setTimeout(function() {
+          const inputElement = document.getElementById("{{ field_ctx.html_id }}--inline-input");
+          if (inputElement) {
+            inputElement.focus();
+            // Для текстовых полей можно выделить содержимое
+            if (inputElement.select && (inputElement.type === 'text' || inputElement.type === 'number' || inputElement.type === 'email' || inputElement.type === 'url' || inputElement.type === 'datetime-local' || inputElement.type === 'date' || inputElement.type === 'time')) {
+              try {
+                inputElement.select();
+              } catch (e) {
+                // Некоторые типы инпутов (например, date/time в некоторых браузерах) не поддерживают select()
+                console.warn("Could not select text in input:", e);
+              }
+            }
+            console.debug("Focused inline input: #{{ field_ctx.html_id }}--inline-input");
+          } else {
+            console.warn("Could not find inline input to focus: #{{ field_ctx.html_id }}--inline-input");
+          }
+        }, 0); // setTimeout 0 для выполнения после текущего стека вызовов
+      })();
+    </script>
 </div>
