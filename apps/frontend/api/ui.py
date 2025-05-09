@@ -49,6 +49,38 @@ async def get_dashboard_content(request: Request, user: AuthenticatedUser = Depe
     }
     return templates.TemplateResponse("dashboard.html", context)
 
+
+@router.get("/{model_name_plural}/list-page", response_class=HTMLResponse, name="get_model_list_page")
+async def get_model_list_page(
+        request: Request,
+        model_name_plural: str, # Например, "users", "companies"
+        user: Optional[AuthenticatedUser] = Depends(get_optional_current_user) # Или get_current_user
+):
+    """
+    Отдает общую страницу-обертку для списка моделей,
+    которая асинхронно загрузит фильтр и таблицу.
+    """
+    templates = get_templates()
+    # Преобразуем множественное число из URL в единственное для ModelRegistry
+    # Это простое предположение, может потребоваться более сложная логика или передача model_name напрямую
+    model_name_singular = model_name_plural
+    if model_name_plural.endswith("ies"):
+        model_name_singular = model_name_plural[:-3] + "y"
+    elif model_name_plural.endswith("s"):
+        model_name_singular = model_name_plural[:-1]
+
+    # Проверка прав доступа к списку этой модели (опционально)
+    # if user and not user.has_permission(f"{model_name_singular.lower()}:list"):
+    #     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")
+
+    context = {
+        "request": request,
+        "user": user,
+        "model_name": model_name_singular, # Передаем имя модели для использования в hx-get
+        "title": f"Список: {model_name_singular.capitalize()}",
+        "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
+    }
+    return templates.TemplateResponse("list_page_wrapper.html", context)
 # --- Основные страницы ---
 @router.get("/", response_class=HTMLResponse, include_in_schema=False, name="read_root")
 async def read_root(request: Request, user: Optional[AuthenticatedUser] = Depends(get_optional_current_user)):

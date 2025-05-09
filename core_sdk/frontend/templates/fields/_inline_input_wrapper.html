@@ -1,5 +1,4 @@
 {# core_sdk/frontend/templates/fields/_inline_input_wrapper.html #}
-{# Ожидает: field_ctx, item_id, model_name, request, url_for, item (весь объект) #}
 <div class="inline-edit-wrapper"
      hx-trigger="keyup[key=='Escape'] from:body"
      hx-get="{{ url_for('get_table_cell_view', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
@@ -7,30 +6,5 @@
      hx-swap="innerHTML">
 
     {% include "fields/_input_inline.html" with context %}
-
-    {# Скрипт для установки фокуса после вставки этого блока #}
-    <script>
-      (function() {
-          debugger
-        // Даем HTMX время на вставку, затем фокусируемся
-        setTimeout(function() {
-          const inputElement = document.getElementById("{{ field_ctx.html_id }}--inline-input");
-          if (inputElement) {
-            inputElement.focus();
-            // Для текстовых полей можно выделить содержимое
-            if (inputElement.select && (inputElement.type === 'text' || inputElement.type === 'number' || inputElement.type === 'email' || inputElement.type === 'url' || inputElement.type === 'datetime-local' || inputElement.type === 'date' || inputElement.type === 'time')) {
-              try {
-                inputElement.select();
-              } catch (e) {
-                // Некоторые типы инпутов (например, date/time в некоторых браузерах) не поддерживают select()
-                console.warn("Could not select text in input:", e);
-              }
-            }
-            console.debug("Focused inline input: #{{ field_ctx.html_id }}--inline-input");
-          } else {
-            console.warn("Could not find inline input to focus: #{{ field_ctx.html_id }}--inline-input");
-          }
-        }, 0); // setTimeout 0 для выполнения после текущего стека вызовов
-      })();
-    </script>
+    {# <script> ... СКРИПТ УДАЛЕН ... </script> #}
 </div>

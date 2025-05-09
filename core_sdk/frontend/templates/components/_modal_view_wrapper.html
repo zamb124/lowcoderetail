@@ -1,0 +1,31 @@
+{# core_sdk/frontend/templates/components/_modal_view_wrapper.html #}
+{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
+{# Этот шаблон будет загружен в #modal-placeholder #}
+
+{% set modal_id = "modal-view-" ~ ctx.model_name ~ "-" ~ ctx.item_id %}
+{% extends "components/_modal_wrapper.html" %}
+
+{% block modal_size %}modal-lg{% endblock %} {# Размер модального окна для просмотра #}
+
+{% block modal_title %}{{ ctx.title }}{% endblock %}
+
+{% block modal_body %}
+    {# Вставляем содержимое страницы просмотра сюда #}
+    {# view.html ожидает ctx, request, user, SDK_STATIC_URL, url_for #}
+    {% include "components/view.html" %}
+{% endblock %}
+
+{% block modal_footer %}
+    <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
+        {# Можно добавить кнопку "Редактировать", если нужно перейти к редактированию из модалки просмотра #}
+        {% if ctx.can_edit %}
+        <button type="button" class="btn btn-primary"
+                hx-get="{{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
+                hx-target="#{{ modal_id }} .modal-content" {# Заменяем контент текущей модалки #}
+                hx-swap="innerHTML">
+            Редактировать
+        </button>
+        {% endif %}
+    </div>
+{% endblock %}

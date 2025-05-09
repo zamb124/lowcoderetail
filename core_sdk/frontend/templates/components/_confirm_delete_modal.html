@@ -3,7 +3,7 @@
 {% set modal_id = "confirm-delete-" ~ ctx.model_name ~ "-" ~ ctx.item_id %}
 {% extends "components/_modal_wrapper.html" %}
 
-{% block modal_size %}modal-md{% endblock %} {# Маленькая модалка для подтверждения #}
+{% block modal_size %}modal-md{% endblock %}
 
 {% block modal_title %}Подтверждение удаления{% endblock %}
 
@@ -16,12 +16,13 @@
 <div class="modal-footer">
     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
     <button type="button" class="btn btn-danger"
+            id="confirm-delete-btn-{{ ctx.item_id }}" {# Добавим ID для отладки, если понадобится #}
             hx-delete="{{ url_for('delete_item', model_name=ctx.model_name, item_id=ctx.item_id) }}"
             {# Цель - строка таблицы или блок просмотра. Ищем ближайший элемент с атрибутом ui_key #}
+            {# Если элемент не найден, HTMX ничего не сделает с DOM, но запрос уйдет #}
             hx-target="closest [ui_key='{{ ctx.model_name }}--{{ ctx.item_id }}']"
             hx-swap="outerHTML swap:1s" {# Удаляем элемент после успешного ответа 2xx с задержкой #}
-            {# data-bs-dismiss="modal" #} {# Закрываем модалку вручную после успешного delete, если нужно #}
-            onclick="this.closest('.modal').querySelector('[data-bs-dismiss]').click()" {# Закрываем модалку после клика #}
+            {# Убираем onclick, будем закрывать модалку через HX-Trigger в ответе от delete_item #}
             >
         Удалить
     </button>

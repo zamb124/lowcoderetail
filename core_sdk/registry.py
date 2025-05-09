@@ -220,7 +220,7 @@ class ModelRegistry:
             logger.error(f"Attempted to get model info for '{model_name}', but ModelRegistry is not configured.")
             raise ConfigurationError("ModelRegistry has not been configured. Ensure registration methods are called.")
 
-        info = cls._registry.get(model_name)
+        info = cls._registry.get(model_name.lower())
         if info is None:
             logger.error(f"Model name '{model_name}' not found in ModelRegistry.")
             raise ConfigurationError(f"Model name '{model_name}' not found in registry. Available models: {list(cls._registry.keys())}")

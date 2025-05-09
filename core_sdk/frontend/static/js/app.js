@@ -3,6 +3,7 @@
 class App {
     constructor(config = {}) {
         this.config = {
+
             wsEnabled: config.wsEnabled !== undefined ? config.wsEnabled : true,
             wsUrl: this._getDefaultWsUrl(),
             wsReconnectInterval: config.wsReconnectInterval || 5000,
@@ -44,6 +45,12 @@ class App {
             },
             defaultLayout: 'vertical',
             localStorageLayoutKey: 'pc-layout-choice',
+            titleResolver: { // Новая конфигурация для TitleResolver
+                debounceTimeout: 100,
+                apiUrl: '/sdk/resolve-titles', // Убедитесь, что URL правильный
+                placeholder: '...',
+                notFoundText: '(не найдено)'
+            },
             //...config
         };
 
@@ -58,9 +65,10 @@ class App {
             this.notificationService,
             this.isAuthenticated
         );
-
+        this.titleResolver = new TitleResolver(this.config.titleResolver);
         console.debug("App instance and managers created.");
         this.themeManager.applyLayoutSetting();
+        this.htmxManager = new HtmxManager(this.componentInitializer, this.notificationService, this.titleResolver); // <--- ПЕРЕДАЕМ
     }
 
     init() {
@@ -76,6 +84,7 @@ class App {
             if (this.isAuthenticated && this.config.wsEnabled) { // Проверяем isEnabled здесь
                 this.webSocketManager.connect();
             }
+            this.titleResolver.scanAndResolve(document.body);
         });
     }
 

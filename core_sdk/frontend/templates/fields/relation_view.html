@@ -3,15 +3,16 @@
     <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
     <div class="col-lg-8">
         {% if field_ctx.value %}
-            {# Предполагаем, что value это ID связанного объекта #}
-            {# TODO: Отображать имя связанного объекта, если оно доступно #}
-            {% set item_id = field_ctx.value %}
-            {% set model_name = field_ctx.extra.relation_model_name %}
-            <a href="#" class="fw-bold text-primary text-hover-warning"
-               hx-get="{{ url_for('get_view', model_name=model_name, item_id=item_id) }}"
-               hx-target="#main-content-area"
-               hx-push-url="/{{ model_name | lower }}s/{{ item_id }}">
-                {{ item_id }} {# Отображаем ID, в идеале нужно имя #}
+            {% set item_id_val = field_ctx.value %}
+            {% set related_model_name = field_ctx.extra.relation_model_name %}
+            <a href="#" class="fw-bold text-primary text-hover-warning needs-title-resolution"
+               data-model-name="{{ related_model_name }}"
+               data-item-id="{{ item_id_val }}"
+               hx-get="{{ url_for('get_view', model_name=related_model_name, item_id=item_id_val) }}"
+               hx-target="#modal-placeholder" {# Открываем в модалке #}
+               hx-swap="innerHTML"
+               title="Просмотр {{ related_model_name }} {{ item_id_val }}">
+                {{- item_id_val|string|truncate(8, True, '...') -}}
             </a>
         {% else %}
             <span class="text-muted">Не указано</span>

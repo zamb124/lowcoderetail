@@ -1,13 +1,16 @@
 # core_sdk/db/__init__.py
-import uuid # Импортируем стандартный модуль
+import uuid
 
 # Импортируем нужные компоненты из base_model
-from .base_model import BaseModelWithMeta, Field, JSONB, datetime, Optional, Dict, Any
+from .base_model import BaseModelWithMeta, JSONB, datetime, Optional, Dict, Any
+# --- ИЗМЕНЕНИЕ: Импортируем CustomField вместо Field из base_model ---
+# --------------------------------------------------------------------
 # Импортируем компоненты из session
 from .session import get_current_session, create_db_and_tables
 
-# Экспортируем стандартный тип UUID
 UUID = uuid.UUID
 
-# Опционально: Можно также экспортировать PG_UUID, если он нужен вовне
-# from .base_model import PG_UUID
+__all__ = [
+    "BaseModelWithMeta", "JSONB", "datetime", "Optional", "Dict", "Any", "UUID",
+    "get_current_session", "create_db_and_tables"
+]

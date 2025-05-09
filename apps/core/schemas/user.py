@@ -3,8 +3,8 @@ import logging
 import uuid
 from typing import Optional, List # Убираем TYPE_CHECKING
 
-from pydantic import EmailStr
-from sqlmodel import SQLModel, Field
+from pydantic import EmailStr, Field
+from sqlmodel import SQLModel
 
 # --- ИСПРАВЛЕНИЕ: Прямой импорт GroupRead ---
 from .group import GroupRead
@@ -15,8 +15,6 @@ logger = logging.getLogger("app.schemas.user")
 # Базовая схема с общими полями пользователя
 class UserBase(SQLModel):
     email: EmailStr = Field(
-        index=True,
-        unique=True,
         description="Email адрес пользователя (уникальный)."
     )
     first_name: Optional[str] = Field(
@@ -37,7 +35,8 @@ class UserBase(SQLModel):
     )
     company_id: Optional[uuid.UUID] = Field(
         default=None,
-        description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL)."
+        description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL).",
+        rel='Company'
     )
 
 # Схема для создания нового пользователя

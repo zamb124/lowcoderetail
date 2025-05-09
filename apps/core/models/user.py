@@ -58,7 +58,7 @@ class User(BaseModelWithMeta, table=True):
             index=True
         ),
         default=None, # Значение по умолчанию для Python
-        description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL)."
+        description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL).ьщвуд"
     )
 
     email: str = Field(

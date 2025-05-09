@@ -1,4 +1,5 @@
 # core_sdk/frontend/templating.py
+import json
 import logging
 import os
 from datetime import datetime
@@ -38,10 +39,14 @@ def setup_jinja_env(template_dirs: List[str]) -> Environment:
         # Простая заглушка, реальная логика может быть сложнее
         return field_ctx.get('field_type', 'text')
     env.filters['get_field_type'] = get_field_type
+    env.filters['tovals'] = json.dumps
     # --------------------------------------------------------------------
 
     logger.info(f"Jinja2 environment configured successfully with search path: {template_dirs}")
     return env
+
+
+
 
 def initialize_templates(service_template_dir: str):
     """

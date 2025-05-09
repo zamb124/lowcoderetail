@@ -2,9 +2,9 @@
 <div class="mb-5 fv-row">
     <div class="form-check form-check-custom form-check-solid">
         {# Скрытое поле для отправки 'false', если чекбокс не отмечен #}
-        <input type="hidden" name="{{ field_ctx.html_name }}" value="false">
+        <input type="hidden" name="{{ field_ctx.html_name }}" {% if not field_ctx.value == None %} {% if field_ctx.value==True %}value="true"{% else %} value="false" {% endif %}{% endif %}>
         <input class="form-check-input" type="checkbox"
-               value="true" {# Значение, отправляемое при отметке #}
+               {% if not field_ctx.value == None %} {% if field_ctx.value==True %}value="true"{% else %} value="false" {% endif %}{% endif %}{# Значение, отправляемое при отметке #}
                id="{{ field_ctx.html_id }}"
                name="{{ field_ctx.html_name }}"
                {% if field_ctx.value %}checked{% endif %}

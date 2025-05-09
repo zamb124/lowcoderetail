@@ -1,161 +1,202 @@
 # core_sdk/frontend/field.py
 import uuid
+import inspect # Для проверки Enum
 from typing import Any, Optional, Dict, TYPE_CHECKING, Type, List, Tuple
-from pydantic.fields import FieldInfo
+from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic import BaseModel
 from enum import Enum
 
 from .config import DEFAULT_FIELD_TYPE_MAPPING, DEFAULT_FIELD_TEMPLATES, DEFAULT_READONLY_FIELDS_IN_EDIT
 from .exceptions import FieldTypeError
-from .utils import get_base_type, is_list_type, get_list_item_type, is_relation, get_relation_model_name # Нужны хелперы
+from .utils import get_base_type, is_list_type, get_list_item_type, is_relation, get_relation_model_name
+import logging # Добавим логгирование
+
+logger = logging.getLogger(__name__) # Логгер для этого модуля
 
 if TYPE_CHECKING:
     from .renderer import ViewRenderer
 
 class FieldRenderContext(BaseModel):
-    """Контекст для передачи в Jinja шаблон поля."""
     name: str
     value: Any
     label: str
     description: Optional[str] = None
-    field_type: str # Определенный тип для рендеринга ('text', 'select', 'relation', etc.)
-    template_path: str # Путь к Jinja шаблону для этого поля и режима
-    mode: str # 'view', 'edit', 'create', 'table'
+    field_type: str
+    template_path: str
+    mode: str
     is_readonly: bool = False
     is_required: bool = False
-    options: Optional[List[Tuple[Any, str]]] = None # [(value, label), ...] for selects/enums
+    options: Optional[List[Tuple[Any, str]]] = None
     errors: Optional[List[str]] = None
     html_id: str
-    html_name: str # Для имен в HTML формах
-    extra: Dict[str, Any] = {} # Дополнительные данные (конфиг, связанные модели и т.д.)
-    # Контекст родительского рендерера (для доступа к общим данным)
+    html_name: str
+    extra: Dict[str, Any] = {}
     parent_context: Optional[Dict[str, Any]] = None
 
 class SDKField:
-    """Представляет поле модели данных для рендеринга."""
-
-    def __init__(self, name: str, field_info: FieldInfo, value: Any, parent: 'ViewRenderer', mode: str):
+    def __init__(self, name: str, field_info: PydanticFieldInfo, value: Any, parent: 'ViewRenderer', mode: str):
         self.name = name
         self.field_info = field_info
         self.value = value
-        self.parent = parent # Ссылка на родительский ViewRenderer
+        self.parent = parent
         self.mode = mode
-        self._config: Dict[str, Any] = {}
+        self.config: Dict[str, Any] = {}
         self._field_type: Optional[str] = None
         self._template_path: Optional[str] = None
         self._options: Optional[List[Tuple[Any, str]]] = None
 
         self._prepare()
 
-    def _prepare(self):
-        """Извлекает конфигурацию и определяет тип поля."""
-        self._extract_config()
-        self._determine_field_type_and_template()
-
     def _extract_config(self):
-        """Извлекает конфигурацию из FieldInfo."""
+        json_schema_extra_data = {}
+        if self.field_info.json_schema_extra:
+            if callable(self.field_info.json_schema_extra):
+                try:
+                    json_schema_extra_data = self.field_info.json_schema_extra()
+                except Exception: pass
+            elif isinstance(self.field_info.json_schema_extra, dict):
+                json_schema_extra_data = self.field_info.json_schema_extra
+
         self.config = {
             "label": self.field_info.title or self.name.replace("_", " ").capitalize(),
             "description": self.field_info.description,
             "is_required": self.field_info.is_required() and self.mode in ['edit', 'create'],
             "is_readonly": False,
             "html_id": f"{self.parent.html_id}__{self.name}",
-            # Имя для формы: может быть простым или вложенным
             "html_name": f"{self.parent.html_name_prefix}[{self.name}]" if self.parent.html_name_prefix else self.name,
-            "extra_json": self.field_info.json_schema_extra or {},
+            "extra_json": json_schema_extra_data,
         }
         self.config["is_readonly"] = self.config["extra_json"].get("readonly", False)
-        # Поля только для чтения в режиме редактирования
         if self.mode == 'edit' and self.name in DEFAULT_READONLY_FIELDS_IN_EDIT:
             self.config["is_readonly"] = True
 
+    def _prepare(self):
+        self._extract_config()
+        self._determine_field_type_and_template()
+
     def _determine_field_type_and_template(self):
-        """Определяет тип поля и путь к шаблону на основе аннотации типа."""
         annotation = self.field_info.annotation
-        base_type = get_base_type(annotation) # Хелпер для извлечения основного типа (убирает Optional, Union и т.д.)
-        type_name = getattr(base_type, '__name__', str(base_type))
+        base_type = get_base_type(annotation) # Хелпер: Optional[T] -> T, Union[T, None] -> T
+        type_name_for_mapping = getattr(base_type, '__name__', str(base_type)) # Имя типа для карты
 
         field_render_type = "default" # Тип по умолчанию
 
-        if is_relation(annotation): # Хелпер для проверки, является ли тип моделью SQLModel/Pydantic
-             field_render_type = "relation"
-             self.config["relation_model_name"] = get_relation_model_name(annotation) # Хелпер для извлечения имени связанной модели
-        elif is_list_type(annotation):
-             list_item_type = get_list_item_type(annotation) # Хелпер
-             if is_relation(list_item_type):
-                 field_render_type = "list_relation"
-                 self.config["relation_model_name"] = get_relation_model_name(list_item_type)
-             else:
-                 # Обработка списков простых типов (e.g., List[str]) - можно сделать отдельный тип "list_simple"
-                 field_render_type = "list_simple" # Или использовать json/text
-        elif issubclass(base_type, Enum):
-            field_render_type = "select"
-            # Опции будут загружены позже асинхронно
-        else:
-            # Ищем тип в карте по имени или по самому типу
-            field_render_type = DEFAULT_FIELD_TYPE_MAPPING.get(type_name,
-                                DEFAULT_FIELD_TYPE_MAPPING.get(base_type, "default"))
+        # Получаем значение 'rel' и 'render_type' из json_schema_extra
+        # self.config уже содержит extra_json
+        related_model_for_id_resolution = self.config["extra_json"].get("rel")
+        explicit_render_type = self.config["extra_json"].get("render_type")
 
+        logger.debug(
+            f"Determining field type for '{self.name}': "
+            f"Annotation='{annotation}', BaseType='{base_type}', "
+            f"Rel='{related_model_for_id_resolution}', ExplicitRenderType='{explicit_render_type}'"
+        )
 
-        if field_render_type == "default":
-             field_render_type = "text" # Запасной вариант - текстовое поле
+        if explicit_render_type:
+            field_render_type = explicit_render_type
+            logger.debug(f"  Using explicit render_type: '{field_render_type}'")
+            # Если тип явно указан, также можем захотеть получить имя связанной модели, если это реляция
+            if field_render_type in ["relation", "list_relation", "uuid_with_title_resolution", "list_uuid_with_title_resolution"]:
+                # Если 'rel' есть в extra_json, используем его, иначе пытаемся извлечь из типа аннотации
+                self.config["relation_model_name"] = related_model_for_id_resolution or get_relation_model_name(annotation)
+                logger.debug(f"    relation_model_name set to: '{self.config['relation_model_name']}'")
+
+        # Логика для полей-идентификаторов, требующих подгрузки title
+        elif related_model_for_id_resolution:
+            if base_type is uuid.UUID or type_name_for_mapping == "UUID":
+                field_render_type = "relation"
+                self.config["relation_model_name"] = related_model_for_id_resolution.lower()
+                logger.debug(f"  Type set to 'uuid_with_title_resolution' for model '{related_model_for_id_resolution}'")
+            elif is_list_type(annotation):
+                list_item_b_type = get_list_item_type(annotation) # Получаем базовый тип элемента списка
+                if list_item_b_type is uuid.UUID or getattr(list_item_b_type, '__name__', '') == "UUID":
+                    field_render_type = "list_relation"
+                    self.config["relation_model_name"] = related_model_for_id_resolution.lower()
+                    logger.debug(f"  Type set to 'list_uuid_with_title_resolution' for model '{related_model_for_id_resolution}'")
+                else:
+                    logger.warning(f"  Field '{self.name}' has 'rel' but is a list of non-UUIDs ('{list_item_b_type}'). Treating as 'list_simple'.")
+                    field_render_type = "list_simple" # Или другая обработка для списков не-UUID с 'rel'
+            else:
+                logger.warning(f"  Field '{self.name}' has 'rel' but is not UUID or List[UUID] (type: '{base_type}'). Defaulting type.")
+                # Переходим к стандартной логике определения типа ниже
+                pass # Позволит следующей логике определить тип
+
+        # Логика для "объектных" реляций (когда тип поля - это другая Pydantic/SQLModel модель)
+        if field_render_type == "default": # Если тип еще не определен предыдущими условиями
+            if is_relation(annotation): # Хелпер проверяет, является ли тип Pydantic/SQLModel
+                field_render_type = "relation"
+                self.config["relation_model_name"] = get_relation_model_name(annotation)
+                logger.debug(f"  Type set to 'relation' for model '{self.config['relation_model_name']}'")
+            elif is_list_type(annotation):
+                list_item_b_type = get_list_item_type(annotation)
+                if is_relation(list_item_b_type):
+                    field_render_type = "list_relation"
+                    self.config["relation_model_name"] = get_relation_model_name(list_item_b_type)
+                    logger.debug(f"  Type set to 'list_relation' for model '{self.config['relation_model_name']}'")
+                else:
+                    # Это список простых типов (str, int, etc.)
+                    field_render_type = "list_simple"
+                    logger.debug(f"  Type set to 'list_simple' (list of '{list_item_b_type}')")
+            elif inspect.isclass(base_type) and issubclass(base_type, Enum):
+                field_render_type = "select"
+                logger.debug(f"  Type set to 'select' for Enum '{base_type.__name__}'")
+            else:
+                # Используем карту типов по умолчанию
+                field_render_type = DEFAULT_FIELD_TYPE_MAPPING.get(type_name_for_mapping,
+                                                                   DEFAULT_FIELD_TYPE_MAPPING.get(base_type, "text")) # Фоллбэк на "text"
+                logger.debug(f"  Type set from DEFAULT_FIELD_TYPE_MAPPING: '{field_render_type}' for base_type '{type_name_for_mapping}'")
+
+        if field_render_type == "default": # Если все еще "default"
+            field_render_type = "text" # Финальный фоллбэк
+            logger.debug(f"  Final fallback type set to 'text'")
+
 
         self._field_type = field_render_type
-
-        # Определяем шаблон
         template_config = DEFAULT_FIELD_TEMPLATES.get(self._field_type, DEFAULT_FIELD_TEMPLATES["default"])
-        self._template_path = template_config.get(self.mode, template_config.get("view")) # Фоллбэк на view
+        self._template_path = template_config.get(self.mode, template_config.get("view")) # Фоллбэк на view режим шаблона
+
+        logger.info(f"Field '{self.name}': Determined field_type='{self._field_type}', template_path='{self._template_path}'")
+
+        # Дополнительная проверка: если это тип для TitleResolver, но нет relation_model_name
+        if self._field_type in ["uuid_with_title_resolution", "list_uuid_with_title_resolution"] and \
+                not self.config.get("relation_model_name"):
+            logger.warning(
+                f"Field '{self.name}' is of type '{self._field_type}' but 'relation_model_name' "
+                f"(expected from json_schema_extra['rel']) is missing. Title resolution might not work."
+            )
 
     async def _load_options(self):
-        """Асинхронно загружает опции для select и relation полей."""
-        if self._field_type == "select" and issubclass(get_base_type(self.field_info.annotation), Enum):
+        if self._field_type == "select" and inspect.isclass(get_base_type(self.field_info.annotation)) and issubclass(get_base_type(self.field_info.annotation), Enum):
             enum_cls = get_base_type(self.field_info.annotation)
             self._options = [(member.value, member.name) for member in enum_cls]
-        elif self._field_type in ["relation", "list_relation"]:
+        elif self._field_type in ["relation", "list_relation", "uuid_with_title_resolution", "list_uuid_with_title_resolution"]:
             relation_model_name = self.config.get("relation_model_name")
             if relation_model_name:
                 try:
-                    # Используем родительский рендерер для доступа к DAM Factory
                     manager = self.parent.dam_factory.get_manager(relation_model_name)
-                    # TODO: Добавить обработку фильтров для опций, если нужно
-                    # TODO: Нужна пагинация для больших списков? Пока грузим все (опасно)
-                    # Используем list, т.к. get не подходит для получения списка опций
-                    results_dict = await manager.list(limit=1000) # Ограничение!
+                    results_dict = await manager.list(limit=1000)
                     items = results_dict.get("items", [])
-                    # Формируем опции (value, label)
                     self._options = []
                     for item in items:
                         item_id = getattr(item, 'id', None)
-                        # Пытаемся найти поле для отображения (title, name, email, ...)
                         label = getattr(item, 'title', None) or \
                                 getattr(item, 'name', None) or \
                                 getattr(item, 'email', None) or \
-                                str(item_id) # Фоллбэк на ID
+                                str(item_id)
                         if item_id:
-                            self._options.append((str(item_id), label)) # Значение - строка UUID
-
+                            self._options.append((str(item_id), label))
                 except Exception as e:
                     logger.error(f"Failed to load options for relation field '{self.name}' (model: {relation_model_name}): {e}", exc_info=True)
-                    self._options = [] # Пустой список при ошибке
+                    self._options = []
 
     async def get_render_context(self) -> FieldRenderContext:
-        """Готовит и возвращает полный контекст для рендеринга поля."""
-        if self._options is None and self._field_type in ["select", "relation", "list_relation"]:
-            await self._load_options()
-
-        # Преобразование значения для отображения (особенно для связей)
-        display_value = self.value
-        if self._field_type == "relation" and self.value and isinstance(self.value, BaseModel):
-             # Для связанных объектов показываем ID или другое поле
-             display_value = getattr(self.value, 'id', str(self.value))
-        elif self._field_type == "list_relation" and isinstance(self.value, list):
-             # Для списков связанных объектов показываем количество или ID
-             display_value = f"{len(self.value)} items" # Пример
+        if self._options is None and self._field_type in ["select", "relation", "list_relation", "uuid_with_title_resolution", "list_uuid_with_title_resolution"]:
+            pass # TODO: что это и зачем?!
+            #await self._load_options()
 
         return FieldRenderContext(
             name=self.name,
-            value=self.value, # Передаем оригинальное значение
-            display_value=display_value, # Добавляем значение для простого отображения
+            value=self.value,
             label=self.config["label"],
             description=self.config["description"],
             field_type=self._field_type,
@@ -164,9 +205,9 @@ class SDKField:
             is_readonly=self.config["is_readonly"],
             is_required=self.config["is_required"],
             options=self._options,
-            errors=None, # Ошибки валидации будут добавляться позже
+            errors=None,
             html_id=self.config["html_id"],
             html_name=self.config["html_name"],
-            extra=self.config["extra_json"],
-            parent_context=self.parent.get_base_context() # Базовый контекст родителя
+            extra=self.config, # Передаем весь self.config, включая extra_json и relation_model_name
+            parent_context=self.parent.get_base_context()
         )

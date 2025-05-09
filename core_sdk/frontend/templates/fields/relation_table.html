@@ -1,12 +1,15 @@
 {# Ожидает: field_ctx (FieldRenderContext), url_for #}
 {% if field_ctx.value %}
-    {% set item_id = field_ctx.value %}
-    {% set model_name = field_ctx.extra.relation_model_name %}
-    <a href="#" class="text-gray-800 text-hover-primary"
-       hx-get="{{ url_for('get_view', model_name=model_name, item_id=item_id) }}"
-       hx-target="#main-content-area"
-       hx-push-url="/{{ model_name | lower }}s/{{ item_id }}">
-        {{ item_id }} {# TODO: Отображать имя, если доступно #}
+    {% set item_id_val = field_ctx.value %} {# Это UUID объекта, для которого нужно получить title #}
+    {% set related_model_name = field_ctx.extra.relation_model_name %}
+    <a href="#" class="fw-bold text-primar  needs-title-resolution"
+       data-model-name="{{ related_model_name }}"
+       data-item-id="{{ item_id_val }}"
+       hx-get="{{ url_for('get_view', model_name=related_model_name, item_id=item_id_val) }}"
+       hx-target="#modal-placeholder" {# Открываем в модалке, как обсуждали #}
+       hx-swap="innerHTML"
+       title="Просмотр {{ related_model_name }} {{ item_id_val }}">
+        {{- item_id_val|string|truncate(8, True, '...') -}} {# Изначально показываем ID или часть ID #}
     </a>
 {% else %}
     <span class="text-muted">-</span>

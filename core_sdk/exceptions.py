@@ -71,3 +71,7 @@ class DetailException(Exception):
 # class AuthorizationError(CoreSDKError):
 #     """Ошибка авторизации (недостаточно прав)."""
 #     pass
+class RenderingError(Exception):
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(detail)

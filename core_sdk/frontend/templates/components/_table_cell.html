@@ -1,18 +1,17 @@
 {# core_sdk/frontend/templates/components/_table_cell.html #}
-{# Ожидает: field_ctx, item, model_name, url_for #}
-{# Добавляем ID ячейке для таргетинга #}
-<td id="cell-{{ model_name }}-{{ item.id }}-{{ field_ctx.name }}"
-    {% if field_ctx.extra.get('editable', true) and not field_ctx.is_readonly %} {# Проверяем, можно ли редактировать поле #}
-    {# Атрибуты для запроса формы редактирования поля #}
+{% set cell_id = "cell-" ~ model_name ~ "-" ~ item.id ~ "-" ~ field_ctx.name %}
+<td id="{{ cell_id }}"
+    {% if field_ctx.extra.get('editable', true) and not field_ctx.is_readonly %}
     hx-get="{{ url_for('get_inline_edit_field', model_name=model_name, item_id=item.id, field_name=field_ctx.name) }}"
-    hx-trigger="click" {# Или dblclick #}
-    hx-target="this" {# Заменяем содержимое этой же ячейки #}
-    hx-swap="innerHTML" {# Заменяем только внутреннее содержимое #}
-    class="editable-cell" {# Добавляем класс для стилизации и JS (опционально) #}
-    title="Кликните для редактирования" {# Подсказка #}
+    hx-trigger="click"
+    hx-target="#{{ cell_id }}"
+    hx-swap="innerHTML"
+    class="editable-cell"
+    title="Кликните для редактирования"
     style="cursor: pointer;"
+    {# Этот атрибут будет прочитан в app.js #}
+    data-autofocus-target="#{{ field_ctx.html_id }}--inline-input"
     {% endif %}
     >
-    {# Включаем шаблон поля в режиме 'table' для начального отображения #}
     {% include field_ctx.template_path with context %}
 </td>

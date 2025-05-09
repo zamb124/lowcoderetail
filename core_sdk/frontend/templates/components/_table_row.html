@@ -1,72 +1,54 @@
 {# core_sdk/frontend/templates/components/_table_row.html #}
-{# Ожидает: item (SQLModel), model_name (str), fields (List[FieldRenderContext прототипов]), request, user, ctx (RenderContext) #}
-<tr ui_key="{{ model_name }}--{{ item.id }}" data-lsn="{{ item.lsn }}">
-    {% for field_prototype_ctx in ctx.fields %} {# ctx.fields - это FieldRenderContext'ы для основного режима LIST #}
-         {# Пропускаем скрытые или ненужные в таблице поля #}
-         {% if field_prototype_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_prototype_ctx.extra.get('table_hidden') %}
-            {#
-                Здесь нам нужно получить FieldRenderContext для этого поля, но в режиме 'table'.
-                Мы не можем просто скопировать field_prototype_ctx и поменять mode,
-                т.к. template_path был вычислен для режима LIST.
-                Вместо этого, мы передадим в _table_cell.html достаточно информации,
-                чтобы он мог запросить или сгенерировать правильный FieldRenderContext.
-                Или, что лучше, ViewRenderer должен подготовить поля для таблицы отдельно.
+{# Ожидает: item, model_name, fields (прототипы), ctx, row_hx_attrs (словарь), request, user, url_for #}
+<tr ui_key="{{ model_name }}--{{ item.id }}" data-lsn="{{ item.lsn }}"
+{% for attr, val in row_hx_attrs.items() %}
+    {{ attr }}='{{ val|safe }}'
+{% endfor %}
+>
+{% for field_prototype_ctx in fields %}
+    {% if field_prototype_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_prototype_ctx.extra.get('table_hidden') %}
+        {% set cell_value = item[field_prototype_ctx.name] %}
+        {% set cell_specific_field_ctx = field_prototype_ctx.model_copy(update={'value': cell_value }) %}
+        {% with field_ctx=cell_specific_field_ctx, item=item, model_name=model_name, request=request, user=user, url_for=url_for %}
+            {% include "components/_table_cell.html" %}
+        {% endwith %}
+    {% endif %}
+{% endfor %}
+<td class="text-end">
+    {# Кнопка Просмотр #}
+    <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+       title="Просмотр {{ model_name }}"
+       hx-get="{{ url_for('get_view', model_name=model_name, item_id=item.id) }}"
+       hx-target="#modal-placeholder" {# <--- ИЗМЕНЕНИЕ: Цель - модальный плейсхолдер #}
+       hx-swap="innerHTML" {# <--- ИЗМЕНЕНИЕ: Заменяем содержимое плейсхолдера #}
+       {# hx-push-url можно убрать, если просмотр в модалке не должен менять URL страницы #}
+       {# или оставить, если это желаемое поведение #}
+       hx-indicator="closest tr">
+        <i class="ti ti-eye f-20"></i>
+    </a>
 
-                Простой вариант сейчас: передать имя поля и значение, а _table_cell.html
-                будет использовать какой-то дефолтный рендеринг или мы должны
-                в _table_cell.html как-то получить FieldRenderContext для режима 'table'.
-
-                Идеально: ctx.fields должен содержать FieldRenderContext'ы, уже настроенные для таблицы.
-                Это значит, что ViewRenderer при mode=LIST должен в self._fields добавлять SDKField,
-                у которых self.mode = RenderMode.TABLE_CELL (или RenderMode.LIST_ITEM).
-
-                Давайте изменим _prepare_fields в ViewRenderer.
-            #}
-            {# --- НОВЫЙ ПОДХОД: Используем field_ctx, который уже должен быть для режима 'table' --- #}
-            {# Предполагаем, что ctx.fields (из RenderContext) содержит FieldRenderContext'ы, #}
-            {# которые были созданы SDKField с режимом RenderMode.TABLE_CELL (или аналогичным) #}
-            {# когда ViewRenderer был в режиме RenderMode.LIST #}
-            {% set current_field_name = field_prototype_ctx.name %}
-            {# Ищем соответствующее поле в данных item #}
-            {% set cell_value = item[current_field_name] %}
-
-            {# Создаем временный контекст для ячейки, если нужно переопределить значение или режим #}
-            {# Но лучше, чтобы field_prototype_ctx уже был правильным для ячейки #}
-            {# Для простоты, предположим, что field_prototype_ctx из ctx.fields УЖЕ настроен для таблицы #}
-            {# И мы просто подставляем актуальное значение из item #}
-            {% set cell_specific_field_ctx = field_prototype_ctx.model_copy(update={'value': cell_value }) %}
-
-            {% with field_ctx=cell_specific_field_ctx, item=item, model_name=model_name %}
-                 {% include "components/_table_cell.html" %}
-            {% endwith %}
-         {% endif %}
-    {% endfor %}
-    <td class="text-end">
-        {# ... кнопки действий ... #}
-        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1"
-           title="Просмотр"
-           hx-get="{{ url_for('get_view', model_name=model_name, item_id=item.id) }}"
-           hx-target="#main-content-area"
-           hx-push-url="/{{ model_name | lower }}s/{{ item.id }}"> {# Исправлен URL #}
-            <i class="ki-duotone ki-eye fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
-        </a>
-        {% if ctx.can_edit %}
-        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1"
-           title="Редактировать"
+    {# Кнопка Редактировать #}
+    {% if ctx.can_edit %}
+        <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+           title="Редактировать {{ model_name }}"
            hx-get="{{ url_for('get_edit_form', model_name=model_name, item_id=item.id) }}"
-           hx-target="#modal-placeholder"
-           hx-swap="innerHTML">
-            <i class="ki-duotone ki-pencil fs-3"><span class="path1"></span><span class="path2"></span></i>
+           hx-target="#modal-placeholder" {# Загружаем форму редактирования в модальное окно #}
+           hx-swap="innerHTML"
+           hx-indicator="closest tr">
+            <i class="ti ti-edit f-20"></i>
         </a>
-        {% endif %}
-         {% if ctx.can_delete %}
-        <a href="#" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm"
-           title="Удалить"
+    {% endif %}
+
+    {# Кнопка Удалить #}
+
+        <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+           title="Удалить {{ model_name }}"
            hx-get="{{ url_for('get_confirm_delete_modal', model_name=model_name, item_id=item.id) }}"
-           hx-target="#modal-placeholder"
-           hx-swap="innerHTML">
-            <i class="ki-duotone ki-trash fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+           hx-target="#modal-placeholder" {# Загружаем модалку подтверждения #}
+           hx-swap="innerHTML"
+           hx-indicator="closest tr">
+            <i class="ti ti-trash f-20"></i>
         </a>
-         {% endif %}
-    </td>
+
+</td>
 </tr>

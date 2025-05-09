@@ -87,16 +87,20 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
             *,
             cursor: Optional[int] = None,
             limit: int = 50,
-            filters: Optional[Mapping[str, Any]] = None,
+            filters: Optional[Mapping[str, Any]] = {},
             direction: Optional[str] = 'asc', # Не используется в RemoteServiceClient
             # order_by не используется стандартным RemoteServiceClient, но может быть в кастомном
             order_by: Optional[List[Any]] = None # pylint: disable=unused-argument
     ) -> List[ModelType]: # Возвращает список, а не словарь с пагинацией как BaseDAM
         logger.debug(f"Remote DAM LIST: Requesting list of '{self.read_schema.__name__}' from endpoint '{self.remote_config.model_endpoint}'. Filters: {filters}, Limit: {limit}, Cursor: {cursor}")
+        filters_cleaned: dict = {}
+        for k, v in filters.items():
+            if v != '':
+                filters_cleaned[k] = v
         try:
             results = await self.client.list(
                 #model_endpoint=self.remote_config.model_endpoint,
-                cursor=cursor, limit=limit, filters=filters, direction=direction,
+                cursor=cursor, limit=limit, filters=filters_cleaned, direction=direction,
             )
             # Результат уже список объектов типа self.read_schema
             return cast(List[ModelType], results)

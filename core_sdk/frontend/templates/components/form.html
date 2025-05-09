@@ -52,7 +52,10 @@
              {# Передаем ошибки конкретного поля в его контекст #}
              {% set field_errors = ctx.errors.get(field_ctx.name) if ctx.errors else None %}
              {% set field_ctx_with_errors = field_ctx.model_copy(update={'errors': field_errors}) %}
-             {% include field_ctx.template_path with {'field_ctx': field_ctx_with_errors} %} {# template_path уже содержит путь к _input.html #}
+            {% with  field_ctx =field_ctx_with_errors %}
+            	{% include field_ctx.template_path %} {# template_path уже содержит путь к _input.html #}
+            {% endwith %}
+
         {% endfor %}
     </div>
     <div class="card-footer d-flex justify-content-end py-6 px-9">

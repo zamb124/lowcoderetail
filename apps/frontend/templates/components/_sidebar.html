@@ -29,31 +29,31 @@
 
                 {# --- Пример ссылки на список Users --- #}
                 {% if user and user.has_permission('users:view') %} {# Проверка прав #}
-                    <li class="pc-item">
-                        <a href="#" class="pc-link"
-                           hx-get="{{ url_for('get_list_view', model_name='user') }}"
-                           hx-target="#main-content-area"
-                           hx-swap="innerHTML"
-                           hx-push-url="/users"> {# Пример URL для списка #}
-                            <span class="pc-micon"><i data-feather="users"></i></span>
-                            <span class="pc-mtext">Users</span>
-                        </a>
-                    </li>
+                <li class="pc-item">
+                    <a href="#" class="pc-link"
+                       hx-get="{{ url_for('get_model_list_page', model_name_plural='users') }}" {# Новый эндпоинт #}
+                       hx-target="#main-content-area"
+                       hx-swap="innerHTML"
+                       hx-push-url="/users/list-page"> {# Новый URL #}
+                        <span class="pc-micon"><i data-feather="users"></i></span>
+                        <span class="pc-mtext">Users</span>
+                    </a>
+                </li>
                 {% endif %}
 
-                {# --- Пример ссылки на список Companies --- #}
-                {% if user and user.has_permission('companies:view') %} {# Проверка прав #}
-                    <li class="pc-item">
-                        <a href="#" class="pc-link"
-                           hx-get="{{ url_for('get_list_view', model_name='Company') }}"
-                           hx-target="#main-content-area"
-                           hx-swap="innerHTML"
-                           hx-push-url="/companies"> {# Пример URL для списка #}
-                            <span class="pc-micon"><i data-feather="briefcase"></i></span>
-                            <span class="pc-mtext">Companies</span>
-                        </a>
-                    </li>
-                {% endif %}
+                 {# --- Пример ссылки на список Companies --- #}
+                {% if user and user.has_permission('companies:view') %}
+                <li class="pc-item">
+                    <a href="#" class="pc-link"
+                       hx-get="{{ url_for('get_model_list_page', model_name_plural='companies') }}" {# Новый эндпоинт #}
+                       hx-target="#main-content-area"
+                       hx-swap="innerHTML"
+                       hx-push-url="/companies/list-page"> {# Новый URL #}
+                        <span class="pc-micon"><i data-feather="briefcase"></i></span>
+                        <span class="pc-mtext">Companies</span>
+                    </a>
+                </li>
+            {% endif %}
 
                 {# --- Пример ссылки на список Groups --- #}
                 {% if user and user.has_permission('groups:view') %} {# Проверка прав #}

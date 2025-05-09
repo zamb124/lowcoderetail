@@ -6,7 +6,7 @@
     {# ... head content ... #}
     <title>{{ title | default("Admin Panel") }} | CorePlatform</title>
     <link rel="icon" href="{{ SDK_STATIC_URL }}/datta-able/assets/images/favicon.svg" type="image/x-icon"/>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/opensans.cssp" rel="stylesheet"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/tabler-icons.min.css"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/feather.css"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/fontawesome.css"/>
@@ -15,9 +15,8 @@
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style.css" id="main-style-link"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style-preset.css"/>
     {% block head_css %}{% endblock %}
-    <script src="https://unpkg.com/htmx.org@1.9.10"
-            integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC"
-            crossorigin="anonymous"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/htmx.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/htmx.json-enc.js"></script>
     {# Choices.js (если используется) #}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
@@ -28,6 +27,7 @@
 </head>
 {# Атрибуты data-pc-* будут установлены JS #}
 <body>
+<div id="modal-placeholder"></div>
 {% include "components/_loader.html" %}
 
 {# --- Сайдбар и Хедер загружаются через HTMX --- #}
@@ -88,6 +88,7 @@
 <script src="{{ SDK_STATIC_URL }}/js/themeManager.js"></script>
 <script src="{{ SDK_STATIC_URL }}/js/htmxManager.js"></script>
 <script src="{{ SDK_STATIC_URL }}/js/webSocketManager.js"></script>
+<script src="{{ SDK_STATIC_URL }}/js/titleResolver.js"></script>
 <script src="{{ SDK_STATIC_URL }}/js/app.js"></script>
 {# Основной класс App последним #}
 

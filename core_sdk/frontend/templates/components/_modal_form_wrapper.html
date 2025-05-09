@@ -1,0 +1,24 @@
+{# core_sdk/frontend/templates/components/_modal_form_wrapper.html #}
+{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
+{# Этот шаблон будет загружен в #modal-placeholder #}
+
+{% set modal_id = "modal-form-" ~ ctx.model_name ~ "-" ~ (ctx.item_id if ctx.item_id else "new") %}
+{% extends "components/_modal_wrapper.html" %} {# Используем базовый _modal_wrapper.html #}
+
+{% block modal_size %}modal-xl{% endblock %} {# Размер модального окна для формы #}
+
+{% block modal_title %}{{ ctx.title }}{% endblock %}
+
+{% block modal_body %}
+    {# Вставляем саму форму сюда #}
+    {# form.html ожидает ctx, request, user, SDK_STATIC_URL, url_for #}
+    {# Эти переменные должны быть доступны из основного контекста, переданного в _modal_form_wrapper #}
+    {% include "components/form.html" %}
+{% endblock %}
+
+{% block modal_footer %}
+    {# Футер будет внутри form.html (кнопки Save/Cancel) #}
+    {# Можно оставить пустым или добавить общие кнопки для модалки, если нужно #}
+    {# Например, кнопка "Закрыть" из _modal_wrapper.html может быть здесь, #}
+    {# но form.html уже имеет свои кнопки отмены. #}
+{% endblock %}
