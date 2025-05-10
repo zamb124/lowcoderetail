@@ -4,7 +4,7 @@ import logging
 from typing import Optional, Any, Dict, List, Type, Tuple
 
 from fastapi import Request, HTTPException
-from pydantic import BaseModel, Field as PydanticField, ValidationError, create_model
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, Field as PydanticField, ValidationError, create_model
 
 from core_sdk.data_access import DataAccessManagerFactory
 from core_sdk.registry import ModelRegistry, ModelInfo
@@ -15,15 +15,19 @@ from core_sdk.schemas.auth_user import AuthenticatedUser
 from .field import SDKField, FieldRenderContext
 from .types import RenderMode
 from .config import DEFAULT_EXCLUDED_FIELDS, STATIC_URL_PATH
-from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter # Для проверки типа фильтра
 
 logger = logging.getLogger("core_sdk.frontend.renderer")
 
-class RenderContext(BaseModel): # Без изменений
+# FallbackFormDataModel БОЛЬШЕ НЕ НУЖЕН
+# class FallbackFormDataModel(PydanticBaseModel):
+#     model_config = ConfigDict(extra='allow')
+
+
+class RenderContext(PydanticBaseModel):
     model_name: str
     mode: RenderMode
     item_id: Optional[uuid.UUID] = None
-    item: Optional[Any] = None
+    item: Optional[Any] = None # Теперь это всегда будет экземпляр схемы режима или None
     items: Optional[List[Any]] = None
     pagination: Optional[Dict[str, Any]] = None
     fields: List[FieldRenderContext] = []
@@ -36,14 +40,11 @@ class RenderContext(BaseModel): # Без изменений
     can_delete: bool = True
     extra: Dict[str, Any] = PydanticField(default_factory=dict)
     table_key: Optional[str] = None
-    # --- Новые поля для контекста фильтра ---
     filter_form_id: Optional[str] = None
     table_target_id: Optional[str] = None
     list_view_url: Optional[str] = None
 
-
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class ViewRenderer:
@@ -56,243 +57,263 @@ class ViewRenderer:
             item_id: Optional[uuid.UUID] = None,
             mode: RenderMode = RenderMode.VIEW,
             query_params: Optional[Dict[str, Any]] = None,
-            parent_html_id: Optional[str] = None,
-            html_name_prefix: Optional[str] = None,
             field_to_focus: Optional[str] = None
     ):
         self.request = request
         self.model_name = model_name
         self.dam_factory = dam_factory
         self.user = user
-        self.item_id = item_id # Для FILTER_FORM item_id не используется
+        self.item_id = item_id
         self.mode = mode
         self.query_params: Dict[str, Any] = query_params if query_params is not None else dict(request.query_params)
-        self.parent_html_id = parent_html_id
-        self.html_name_prefix = html_name_prefix
         self.field_to_focus = field_to_focus
+
         self.templates: Jinja2Templates = get_templates()
 
         try:
             self.model_info: ModelInfo = ModelRegistry.get_model_info(model_name)
         except ConfigurationError as e:
-            logger.error(f"Failed to initialize ViewRenderer for '{model_name}': {e}")
             raise RenderingError(f"Model '{model_name}' not found in registry.") from e
 
-        # Менеджер основной модели (для LIST, VIEW и т.д.)
-        # Для FILTER_FORM он может не использоваться напрямую, но нужен для ModelInfo
         self.manager = self.dam_factory.get_manager(model_name, request=self.request)
 
-        self.item: Optional[BaseModel] = None # Для FILTER_FORM это будет экземпляр схемы фильтра
-        self.items: Optional[List[BaseModel]] = None
+        self.item: Optional[PydanticBaseModel] = None # Всегда будет экземпляр схемы режима или None
+        self.items: Optional[List[PydanticBaseModel]] = None
         self.pagination: Optional[Dict[str, Any]] = None
         self._fields: List[SDKField] = []
         self.errors: Optional[Dict[str, Any]] = None
+        self.extra: Dict[str, Any] = {}
 
         instance_uuid = uuid.uuid4().hex[:8]
-        id_part = 'filter' if mode == RenderMode.FILTER_FORM else (str(item_id) if item_id else ('new' if mode == RenderMode.CREATE else ('rows' if mode == RenderMode.LIST_ROWS else 'list')))
-        self.html_id = f"vf-{model_name}-{id_part}-{instance_uuid}"
-        logger.debug(f"ViewRenderer initialized for {model_name} (ID: {item_id}, Mode: {mode}, HTML_ID: {self.html_id}, QueryParams: {self.query_params})")
+        id_mode_part = self.mode.value.lower()
+        id_item_part = str(item_id) if item_id else ('new' if mode == RenderMode.CREATE else id_mode_part)
+        self.html_id = f"sdk-{model_name.lower()}-{id_item_part}-{id_mode_part}-{instance_uuid}"
 
-    def _get_schema_for_mode(self, mode: Optional[RenderMode] = None) -> Type[BaseModel]:
+        logger.debug(
+            f"ViewRenderer initialized for {model_name} "
+            f"(ID: {item_id}, Mode: {mode}, HTML_ID: {self.html_id}, "
+            f"FocusField: {field_to_focus}, QueryParams: {self.query_params})"
+        )
+
+    def _get_schema_for_mode(self, mode: Optional[RenderMode] = None) -> Type[PydanticBaseModel]:
         current_mode = mode or self.mode
-        if current_mode == RenderMode.CREATE and self.model_info.create_schema_cls:
-            return self.model_info.create_schema_cls
-        if current_mode == RenderMode.EDIT and self.model_info.update_schema_cls:
-            return self.model_info.update_schema_cls
-        if current_mode == RenderMode.FILTER_FORM: # <--- НОВАЯ ЛОГИКА
-            filter_schema = self.model_info.filter_cls
-            if not filter_schema or not issubclass(filter_schema, BaseModel):
-                logger.warning(f"No valid Pydantic filter schema for {self.model_name} in FILTER_FORM mode. Using empty model.")
-                # Возвращаем пустую Pydantic модель, чтобы _prepare_fields не упал
-                return create_model(f"{self.model_name}EmptyFilter", __base__=BaseModel)
-            return filter_schema
-        return self.model_info.read_schema_cls or self.model_info.model_cls
+        target_schema: Optional[Type[PydanticBaseModel]] = None
 
+        if current_mode == RenderMode.CREATE:
+            target_schema = self.model_info.create_schema_cls
+        elif current_mode == RenderMode.EDIT:
+            target_schema = self.model_info.update_schema_cls
+        elif current_mode == RenderMode.FILTER_FORM:
+            filter_schema = self.model_info.filter_cls
+            if filter_schema and issubclass(filter_schema, PydanticBaseModel):
+                target_schema = filter_schema
+
+        if not target_schema: # Для VIEW, LIST, TABLE_CELL или если специфичная схема не найдена
+            target_schema = self.model_info.read_schema_cls or self.model_info.model_cls
+
+        if not target_schema or not issubclass(target_schema, PydanticBaseModel):
+            logger.error(f"Could not determine a valid Pydantic schema for model '{self.model_name}' in mode '{current_mode.value}'. Falling back to basic BaseModel.")
+            # Это крайний случай, если даже model_cls не Pydantic модель (что не должно быть для SQLModel)
+            return create_model(f"{self.model_name}ErrorFallbackSchema", __base__=PydanticBaseModel)
+
+        return target_schema
 
     async def _load_data(self):
-        logger.debug(f"Loading data for {self.model_name} (ID: {self.item_id}, Mode: {self.mode}) with query_params: {self.query_params}")
+        # Этот метод вызывается ТОЛЬКО если self.item (или self.items) ЕЩЕ НЕ УСТАНОВЛЕН.
+        # Ручки FastAPI сами установят self.item данными из формы при ошибке валидации.
+        if self.item is not None and self.mode not in [RenderMode.LIST, RenderMode.LIST_ROWS]:
+            logger.debug(f"Data already present in self.item for mode {self.mode.value}, skipping _load_data.")
+            return
+        if self.items is not None and self.mode in [RenderMode.LIST, RenderMode.LIST_ROWS]:
+            logger.debug(f"Data already present in self.items for mode {self.mode.value}, skipping _load_data.")
+            return
+
+        logger.debug(f"Loading data via _load_data for {self.model_name} (Mode: {self.mode.value})")
+
         if self.mode in [RenderMode.VIEW, RenderMode.EDIT, RenderMode.TABLE_CELL]:
-            # ... (без изменений) ...
-            if not self.item_id: raise RenderingError(f"Item ID required for mode '{self.mode}'.")
-            if self.item is None: self.item = await self.manager.get(self.item_id)
+            if not self.item_id: raise RenderingError(f"Item ID required for mode '{self.mode.value}'.")
+            self.item = await self.manager.get(self.item_id)
             if not self.item: raise RenderingError(f"{self.model_name} with ID {self.item_id} not found.", status_code=404)
+
         elif self.mode == RenderMode.CREATE:
-            # ... (без изменений) ...
-            if self.item is None:
-                schema = self._get_schema_for_mode()
-                try: self.item = schema()
-                except Exception as e: logger.error(f"Failed to instantiate schema {schema.__name__} for create: {e}"); self.item = self.model_info.model_cls()
-        elif self.mode == RenderMode.FILTER_FORM: # <--- НОВАЯ ЛОГИКА
+            schema = self._get_schema_for_mode()
+            try: self.item = schema() # Создаем пустой экземпляр
+            except Exception as e:
+                logger.error(f"Failed to instantiate schema {schema.__name__} for CREATE mode: {e}")
+                # Если не удалось создать даже пустой экземпляр (очень редкий случай для Pydantic)
+                # self.item останется None, _prepare_fields обработает это.
+                self.item = None
+
+        elif self.mode == RenderMode.FILTER_FORM:
             filter_schema_cls = self._get_schema_for_mode()
             filter_instance_data = {}
-            if filter_schema_cls and hasattr(filter_schema_cls, 'model_fields'): # Убедимся, что это Pydantic модель
+            if hasattr(filter_schema_cls, 'model_fields'):
                 for field_name in filter_schema_cls.model_fields.keys():
                     if field_name in self.query_params:
                         param_values = self.request.query_params.getlist(field_name)
+                        # ... (логика извлечения param_values как была) ...
                         field_type_info = filter_schema_cls.model_fields[field_name].annotation
                         origin_type = getattr(field_type_info, '__origin__', None)
-                        if origin_type is list or origin_type is List:
-                            filter_instance_data[field_name] = param_values
-                        elif param_values:
-                            filter_instance_data[field_name] = param_values[0]
+                        if origin_type is list or origin_type is List: filter_instance_data[field_name] = param_values
+                        elif param_values: filter_instance_data[field_name] = param_values[0]
             try:
-                self.item = filter_schema_cls(**filter_instance_data) # self.item теперь экземпляр фильтра
+                self.item = filter_schema_cls(**filter_instance_data)
             except ValidationError as ve:
-                logger.warning(f"Validation error instantiating filter schema {filter_schema_cls.__name__} with query params: {ve.errors()}")
-                self.errors = {"_form": [f"Invalid filter parameters: {err['msg']}" for err in ve.errors()]}
-                self.item = filter_schema_cls() # Пустой экземпляр при ошибке
-            except Exception as e:
-                logger.error(f"Error instantiating filter schema {filter_schema_cls.__name__}: {e}")
-                self.item = filter_schema_cls() # Пустой экземпляр при ошибке
-            logger.debug(f"Filter form instance created: {self.item.model_dump(exclude_none=True) if self.item else 'None'}")
+                self.errors = {"_form": [f"Invalid filter params: {err['msg']}" for err in ve.errors()]}
+                self.item = filter_schema_cls() # Пустой экземпляр при ошибке валидации фильтра
 
         elif self.mode == RenderMode.LIST or self.mode == RenderMode.LIST_ROWS:
-            # ... (без изменений) ...
-            dam_filters = { k: v for k, v in self.query_params.items() if k not in ["cursor", "limit", "direction"] }
+            # ... (логика загрузки self.items и self.pagination как была, с сохранением direction) ...
+            dam_filters = {k: v for k, v in self.query_params.items() if k not in ["cursor", "limit", "direction"]}
             cursor_str = self.query_params.get("cursor")
             cursor = int(cursor_str) if cursor_str and cursor_str.isdigit() else None
-            default_limit = 10 if self.mode == RenderMode.LIST_ROWS else 50
+            default_limit = 10 if self.mode == RenderMode.LIST_ROWS else 20
             limit_str = self.query_params.get("limit", str(default_limit))
             limit = int(limit_str) if limit_str.isdigit() else default_limit
             direction = self.query_params.get("direction", "asc")
             if direction not in ["asc", "desc"]: direction = "asc"
             result_dict = await self.manager.list(cursor=cursor, limit=limit, filters=dam_filters, direction=direction)
             self.items = result_dict.get("items", [])
-            next_page_url_for_list_mode = None
-            next_cursor_val = result_dict.get("next_cursor")
-            if self.mode == RenderMode.LIST and next_cursor_val and self.items:
-                try:
-                    base_query_params_for_next_page = { "cursor": str(next_cursor_val), "limit": str(limit) }
-                    next_page_url_for_list_mode = str(self.request.url_for('get_list_rows', model_name=self.model_name).include_query_params(**base_query_params_for_next_page))
-                except Exception as e_url: logger.error(f"Error generating next_page_url for {self.model_name} (LIST mode): {e_url}")
-            self.pagination = { "next_cursor": next_cursor_val, "prev_cursor": result_dict.get("prev_cursor"), "limit": result_dict.get("limit", limit), "count": result_dict.get("count", len(self.items) if self.items else 0), "total_count": result_dict.get("total_count"), "next_page_url": next_page_url_for_list_mode, }
-        logger.debug(f"Data loaded for {self.mode}: {len(self.items) if self.items else 0} items. Pagination: {self.pagination}")
+            self.pagination = {
+                "next_cursor": result_dict.get("next_cursor"),
+                "limit": result_dict.get("limit", limit),
+                "count": result_dict.get("count", len(self.items) if self.items else 0),
+                "direction": direction
+            }
+        logger.debug(f"Data loaded by _load_data: item={self.item is not None}, items_count={len(self.items) if self.items else 'N/A'}")
 
-
-    def _prepare_fields(self):
+    async def _prepare_fields(self):
         self._fields = []
-        schema_to_iterate = self._get_schema_for_mode()
+        # schema_to_get_field_info - это схема, из которой мы берем метаданные полей
+        # (title, json_schema_extra, тип аннотации).
+        schema_for_field_metadata = self._get_schema_for_mode()
 
         if self.mode in [RenderMode.LIST, RenderMode.LIST_ROWS]:
-            # ... (без изменений) ...
             schema_for_columns = self.model_info.read_schema_cls or self.model_info.model_cls
-            for name, field_info_from_schema in schema_for_columns.model_fields.items():
-                if name in DEFAULT_EXCLUDED_FIELDS:
-                    if name in ["created_at", "updated_at"]: pass
-                    else: continue
-                self._fields.append(SDKField(name, field_info_from_schema, None, self, RenderMode.TABLE_CELL))
-        elif self.mode == RenderMode.FILTER_FORM: # <--- НОВАЯ ЛОГИКА
-            if self.item and hasattr(self.item, 'model_fields'): # self.item это экземпляр схемы фильтра
-                for name, field_model_info in self.item.model_fields.items():
-                    # Пропускаем стандартные поля fastapi-filter, если они не нужны в UI
-                    # или если они не помечены как ui_visible
-                    is_standard_filter_field = name in ["order_by", "search"]
-                    ui_visible = field_model_info.json_schema_extra.get("ui_visible", False) if field_model_info.json_schema_extra else False
+            for name, field_info_obj in schema_for_columns.model_fields.items():
+                if name in DEFAULT_EXCLUDED_FIELDS and name not in ["created_at", "updated_at"]: continue
+                self._fields.append(SDKField(name, field_info_obj, None, self, RenderMode.TABLE_CELL))
 
-                    if is_standard_filter_field and not ui_visible:
-                        # Для 'search' делаем исключение, если нет явного ui_visible, считаем его видимым
-                        if name == "search" and not field_model_info.json_schema_extra:
-                            pass # Показываем search по умолчанию
-                        else:
-                            continue
+        elif self.mode == RenderMode.TABLE_CELL:
+            if self.item and self.field_to_focus:
+                # Для ячейки метаданные поля берем из read_schema
+                schema_for_cell_metadata = self.model_info.read_schema_cls or self.model_info.model_cls
+                if self.field_to_focus in schema_for_cell_metadata.model_fields:
+                    field_info_obj = schema_for_cell_metadata.model_fields[self.field_to_focus]
+                    value = getattr(self.item, self.field_to_focus, None)
+                    self._fields.append(SDKField(self.field_to_focus, field_info_obj, value, self, RenderMode.TABLE_CELL))
+                else: logger.warning(f"Field to focus '{self.field_to_focus}' not in schema for TABLE_CELL.")
+            else: logger.warning(f"Cannot prepare field for TABLE_CELL: item or field_to_focus missing.")
 
-                    # Для полей фильтра всегда используем RenderMode.EDIT
-                    self._fields.append(SDKField(name, field_model_info, getattr(self.item, name, None), self, RenderMode.EDIT))
-            else:
-                logger.warning(f"No item (filter schema instance) or model_fields to prepare fields for {self.model_name} in mode {self.mode}")
+        elif self.item: # Для VIEW, EDIT, CREATE, FILTER_FORM
+            # self.item теперь всегда экземпляр schema_for_field_metadata (или None)
+            if not hasattr(self.item, 'model_fields'): # Проверка, что item это Pydantic-like объект
+                logger.warning(f"Item for mode {self.mode.value} (type: {type(self.item)}) has no model_fields. Cannot prepare fields.")
+                return
 
-        elif self.item: # Для VIEW, EDIT, CREATE
-            # ... (без изменений) ...
-            for name, field_info_from_schema in schema_to_iterate.model_fields.items():
-                if name in DEFAULT_EXCLUDED_FIELDS and self.mode != RenderMode.CREATE: continue
+            # Итерируемся по полям схемы, которая соответствует текущему режиму (schema_for_field_metadata)
+            for name, field_info_obj in schema_for_field_metadata.model_fields.items():
+                # ... (пропуск DEFAULT_EXCLUDED_FIELDS и логика ui_visible для FILTER_FORM как была) ...
+                if self.mode == RenderMode.FILTER_FORM:
+                    is_standard = name in ["order_by", "search"]
+                    ui_visible = (field_info_obj.json_schema_extra or {}).get("ui_visible", name == "search" if is_standard else True)
+                    if not ui_visible : continue
+                elif name in DEFAULT_EXCLUDED_FIELDS and self.mode != RenderMode.CREATE:
+                    continue
+
+                # Значение берем из self.item (который содержит данные от пользователя при ошибке,
+                # или данные из БД, или пустые значения для CREATE/FILTER_FORM)
                 value = getattr(self.item, name, None)
-                current_field_mode = RenderMode.TABLE_CELL if self.mode == RenderMode.TABLE_CELL else self.mode
-                self._fields.append(SDKField(name, field_info_from_schema, value, self, current_field_mode))
+                current_field_render_mode = RenderMode.EDIT if self.mode == RenderMode.FILTER_FORM else self.mode
+
+                self._fields.append(SDKField(name, field_info_obj, value, self, current_field_render_mode))
         else:
-            logger.warning(f"No data source (item) to prepare fields for {self.model_name} in mode {self.mode}")
+            logger.warning(f"No item to prepare fields for {self.model_name} in mode {self.mode.value}")
+        logger.debug(f"Prepared {len(self._fields)} SDKFields for mode {self.mode.value}. Fields: {[f.name for f in self._fields]}")
 
+    async def get_render_context(self) -> RenderContext:
+        # Гарантируем, что данные загружены или инициализированы перед подготовкой полей
+        if self.mode in [RenderMode.VIEW, RenderMode.EDIT, RenderMode.CREATE, RenderMode.FILTER_FORM, RenderMode.TABLE_CELL]:
+            if self.item is None: await self._load_data()
+        elif self.mode in [RenderMode.LIST, RenderMode.LIST_ROWS]:
+            if self.items is None: await self._load_data()
 
-    async def get_render_context(self) -> RenderContext: # Без изменений в сигнатуре
-        # ... (логика как была, но теперь обрабатывает и FILTER_FORM) ...
-        try:
-            await self._load_data()
-            self._prepare_fields()
-            field_contexts_for_main_render = []
-            if self.mode != RenderMode.LIST_ROWS: # Для LIST_ROWS поля не нужны в основном контексте
-                for sdk_field in self._fields:
-                    field_contexts_for_main_render.append(await sdk_field.get_render_context())
+        await self._prepare_fields()
 
-            title = f"{self.mode.value.capitalize()} {self.model_name}"
-            if self.mode == RenderMode.VIEW and self.item:
-                display_name = getattr(self.item, 'title', None) or getattr(self.item, 'name', None) or str(self.item_id)
-                title = f"{self.model_name}: {display_name}"
-            elif self.mode in [RenderMode.LIST, RenderMode.LIST_ROWS]:
-                title = f"Список: {self.model_name}"
-            elif self.mode == RenderMode.FILTER_FORM:
-                title = f"Фильтры для: {self.model_name}"
+        field_contexts: List[FieldRenderContext] = []
+        if self.mode not in [RenderMode.LIST_ROWS]:
+            for sdk_field in self._fields:
+                field_contexts.append(await sdk_field.get_render_context())
 
-            can_edit, can_create, can_delete = True, True, bool(self.item_id and self.mode != RenderMode.CREATE)
-
-            render_ctx_errors = self.errors
-            if self.errors and isinstance(self.errors, list) and self.errors and isinstance(self.errors[0], dict):
+        # ... (формирование title, processed_errors, filter_form_id_val и т.д. как было) ...
+        title_map = { # ... как было ...
+            RenderMode.VIEW: f"{self.model_info.model_cls.__name__}: {getattr(self.item, 'name', None) or getattr(self.item, 'title', None) or self.item_id or 'Детали'}",
+            RenderMode.EDIT: f"Редактирование: {self.model_info.model_cls.__name__} ({self.item_id})",
+            RenderMode.CREATE: f"Создание: {self.model_info.model_cls.__name__}",
+            RenderMode.LIST: f"Список: {self.model_info.model_cls.__name__}",
+            RenderMode.FILTER_FORM: f"Фильтры: {self.model_info.model_cls.__name__}",
+            RenderMode.TABLE_CELL: f"Поле: {self.field_to_focus}" if self.field_to_focus else "Ячейка таблицы",
+        }
+        title = title_map.get(self.mode, f"{self.mode.value.capitalize()} {self.model_name}")
+        processed_errors = None # Логика обработки self.errors как была
+        if self.errors:
+            if isinstance(self.errors, list) and self.errors and isinstance(self.errors[0], dict) and "loc" in self.errors[0] and "msg" in self.errors[0]:
                 processed_errors = {}
                 for error_item in self.errors:
-                    loc = error_item.get("loc", ["_form"])
-                    field_name = loc[-1] if len(loc) > 1 else "_form"
-                    if field_name not in processed_errors: processed_errors[field_name] = []
-                    processed_errors[field_name].append(error_item.get("msg", "Validation error"))
-                render_ctx_errors = processed_errors
-            elif self.errors and not isinstance(self.errors, dict):
-                render_ctx_errors = {"_form": [str(self.errors)] if isinstance(self.errors, str) else self.errors}
+                    loc = error_item.get("loc", []); field_name_key = "_form"
+                    if len(loc) > 0:
+                        if len(loc) == 1 and loc[0] != "body": field_name_key = str(loc[0])
+                        elif len(loc) > 1: field_name_key = str(loc[-1])
+                    if field_name_key not in processed_errors: processed_errors[field_name_key] = []
+                    processed_errors[field_name_key].append(error_item.get("msg", "Validation error"))
+            elif isinstance(self.errors, dict): processed_errors = self.errors
+            elif isinstance(self.errors, str): processed_errors = {"_form": [self.errors]}
+            elif isinstance(self.errors, list): processed_errors = {"_form": [str(e) for e in self.errors]}
+            else: processed_errors = {"_form": ["An unknown error occurred."]}
+        filter_form_id_val, list_view_url_val, table_target_id_val = None, None, None # Логика как была
+        if self.mode == RenderMode.LIST or self.mode == RenderMode.FILTER_FORM:
+            filter_form_id_val = f"filter--{self.model_name.lower()}"
+            table_target_id_val = f"#table-placeholder-{self.model_name.lower()}"
+            try: list_view_url_val = str(self.request.url_for('get_list_view', model_name=self.model_name))
+            except Exception: pass
 
-            # --- Дополнительные данные для контекста фильтра ---
-            filter_form_id = None
-            table_target_id = None
-            list_view_url = None
-            if self.mode == RenderMode.FILTER_FORM:
-                filter_form_id = f"filter--{self.model_name.lower()}"
-                table_target_id = f"#table-placeholder-{self.model_name.lower()}"
-                try:
-                    list_view_url = str(self.request.url_for('get_list_view', model_name=self.model_name))
-                except Exception as e_url_filter:
-                    logger.error(f"Error generating list_view_url for filter form ({self.model_name}): {e_url_filter}")
+        return RenderContext(
+            model_name=self.model_name, mode=self.mode, item_id=self.item_id, item=self.item,
+            items=self.items, pagination=self.pagination, fields=field_contexts,
+            errors=processed_errors, html_id=self.html_id, title=title,
+            can_edit=True, can_create=True, can_delete=bool(self.item_id),
+            extra=self.extra, table_key=self.model_name.lower(),
+            filter_form_id=filter_form_id_val, table_target_id=table_target_id_val,
+            list_view_url=list_view_url_val
+        )
 
-
-            return RenderContext(
-                model_name=self.model_name,
-                mode=self.mode,
-                item_id=self.item_id, item=self.item,
-                items=self.items, pagination=self.pagination, fields=field_contexts_for_main_render,
-                actions=[], errors=render_ctx_errors, html_id=self.html_id, title=title,
-                can_edit=can_edit, can_create=can_create, can_delete=can_delete,
-                extra={}, table_key=self.model_name.lower(),
-                filter_form_id=filter_form_id, # <--- НОВОЕ
-                table_target_id=table_target_id, # <--- НОВОЕ
-                list_view_url=list_view_url # <--- НОВОЕ
-            )
-        except Exception as e:
-            logger.exception(f"Unexpected error in get_render_context")
-            raise e
-
-    async def get_render_context_for_field(self, field_name: str) -> Optional[FieldRenderContext]: # Без изменений
-        # ...
-        if not self.item and self.item_id and self.mode in [RenderMode.EDIT, RenderMode.VIEW, RenderMode.TABLE_CELL]: await self._load_data()
-        elif not self.item and self.mode == RenderMode.CREATE: await self._load_data()
-        # Для FILTER_FORM self.item (экземпляр фильтра) уже должен быть загружен в get_render_context -> _load_data
-        elif self.mode == RenderMode.FILTER_FORM and not self.item : await self._load_data()
-
+    async def get_render_context_for_field(self, field_name: str) -> Optional[FieldRenderContext]:
+        # Гарантируем, что self.item загружен или инициализирован
+        if not self.item:
+            if self.item_id and self.mode in [RenderMode.EDIT, RenderMode.VIEW, RenderMode.TABLE_CELL]:
+                await self._load_data()
+            elif self.mode == RenderMode.CREATE or self.mode == RenderMode.FILTER_FORM:
+                await self._load_data()
         if not self.item: return None
 
-        schema = self._get_schema_for_mode(self.mode) # schema будет схемой фильтра для FILTER_FORM
-        if field_name not in schema.model_fields: return None
+        schema_for_field_metadata = self._get_schema_for_mode()
+        if self.mode == RenderMode.TABLE_CELL:
+            schema_for_field_metadata = self.model_info.read_schema_cls or self.model_info.model_cls
 
-        field_info_from_schema = schema.model_fields[field_name]
+        if field_name not in schema_for_field_metadata.model_fields: return None
+
+        field_info_obj = schema_for_field_metadata.model_fields[field_name]
         value = getattr(self.item, field_name, None)
 
-        # Для полей фильтра всегда используем RenderMode.EDIT, чтобы получить инпуты
-        current_field_mode = RenderMode.EDIT if self.mode == RenderMode.FILTER_FORM else self.mode
+        current_field_render_mode = self.mode
+        # Для инлайн-редактирования поле всегда рендерится в режиме EDIT (для _inline_input_wrapper)
+        if self.mode == RenderMode.EDIT and self.field_to_focus == field_name:
+            pass # current_field_render_mode уже EDIT
+        # Для ячейки таблицы режим TABLE_CELL
+        elif self.mode == RenderMode.TABLE_CELL and self.field_to_focus == field_name:
+            current_field_render_mode = RenderMode.TABLE_CELL
 
-        sdk_field = SDKField(field_name, field_info_from_schema, value, self, current_field_mode)
+        sdk_field = SDKField(field_name, field_info_obj, value, self, current_field_render_mode)
         field_render_ctx = await sdk_field.get_render_context()
 
         if self.errors and isinstance(self.errors, dict) and field_name in self.errors:
@@ -300,117 +321,75 @@ class ViewRenderer:
 
         return field_render_ctx
 
-
-    def get_base_context(self) -> Dict[str, Any]: # Без изменений
-        return { "request": self.request, "model_name": self.model_name, "mode": self.mode.value, "item_id": self.item_id, "parent_html_id": self.html_id, }
+    def get_base_context(self) -> Dict[str, Any]:
+        return { "request": self.request, "model_name": self.model_name, "mode": self.mode.value, "item_id": self.item_id, "parent_html_id": self.html_id, "user": self.user }
 
     async def prepare_response_data(self) -> Tuple[str, Dict[str, Any]]:
+        # ... (логика выбора final_template_name и context_dict как в предыдущем ответе) ...
+        # Важно, что self.item теперь всегда будет экземпляром нужной схемы (или None)
         render_context_instance = await self.get_render_context()
-
-        base_template_paths = {
-            RenderMode.VIEW: "view.html", # Базовый шаблон для просмотра
-            RenderMode.EDIT: "_modal_form_wrapper.html",
-            RenderMode.CREATE: "_modal_form_wrapper.html",
-            RenderMode.LIST: "table.html",
-            RenderMode.LIST_ROWS: "_table_rows_fragment.html",
-            RenderMode.TABLE_CELL: render_context_instance.fields[0].template_path if render_context_instance.fields else "fields/text_table.html",
-            RenderMode.FILTER_FORM: "_filter_form.html",
+        content_template_map = {
+            RenderMode.VIEW: "components/view.html",
+            RenderMode.EDIT: "components/form.html",
+            RenderMode.CREATE: "components/form.html",
+            RenderMode.LIST: "components/table.html",
+            RenderMode.LIST_ROWS: "components/_table_rows_fragment.html",
+            RenderMode.TABLE_CELL: (render_context_instance.fields[0].template_path
+                                    if render_context_instance.fields and render_context_instance.fields[0].template_path
+                                    else "fields/text_table.html"),
+            RenderMode.FILTER_FORM: "components/_filter_form.html",
         }
-
-        base_mode_template_name = base_template_paths.get(self.mode)
-        if not base_mode_template_name:
-            logger.error(f"No base template defined for mode {self.mode}")
-            raise RenderingError(f"Base template for mode {self.mode} not defined.")
-
-        # --- Логика выбора шаблона с учетом модального окна для VIEW ---
-        final_template_name = ""
-        is_modal_request = self.request.headers.get("HX-Target") == "modal-placeholder"
-
-        if self.mode == RenderMode.VIEW and is_modal_request:
-            # Если режим VIEW и запрос на модалку, используем обертку
-            # Можно создать отдельный _modal_view_wrapper.html, если он отличается от _modal_form_wrapper.html
-            # Для простоты пока используем тот же, что и для форм, но это может потребовать адаптации form.html
-            # или создания _view_content_for_modal.html, который будет включаться в _modal_wrapper.html
-            # Предположим, что view.html сам по себе подходит для тела модалки.
-            # Тогда нам нужен _modal_wrapper.html, который будет включать view.html
-            # Давайте создадим _modal_view_wrapper.html для ясности
-
-            # Проверяем специфичный для модели шаблон обертки
-            model_specific_modal_view_wrapper = f"components/{self.model_name.lower()}/_modal_view_wrapper.html"
-            generic_modal_view_wrapper = "components/_modal_view_wrapper.html" # Новый шаблон
-            try:
-                self.templates.env.get_template(model_specific_modal_view_wrapper)
-                final_template_name = model_specific_modal_view_wrapper
-            except Exception:
-                final_template_name = generic_modal_view_wrapper
-            logger.debug(f"Using modal view wrapper: {final_template_name} for model {self.model_name}, mode {self.mode}")
-
-        elif self.mode == RenderMode.TABLE_CELL:
-            final_template_name = base_mode_template_name # Уже полный путь
-        else:
-            # Стандартная логика выбора (специфичный для модели или общий)
-            model_specific_template = f"components/{self.model_name.lower()}/{base_mode_template_name}"
-            generic_component_template = f"components/{base_mode_template_name}"
+        template_name_for_content = content_template_map.get(self.mode)
+        if not template_name_for_content: raise RenderingError(f"Content template for mode {self.mode} not defined.")
+        final_template_name = template_name_for_content
+        if self.mode not in [RenderMode.TABLE_CELL, RenderMode.LIST_ROWS]:
+            clean_name = template_name_for_content.split('/')[-1]
+            model_specific_template = f"components/{self.model_name.lower()}/{clean_name}"
             try:
                 self.templates.env.get_template(model_specific_template)
                 final_template_name = model_specific_template
-            except Exception:
-                final_template_name = generic_component_template
-            logger.debug(f"Using template: {final_template_name} for model {self.model_name}, mode {self.mode} (specific not found: {model_specific_template if final_template_name == generic_component_template else ''})")
-
-        # ... (остальная часть метода prepare_response_data без изменений) ...
+            except Exception: pass
+        logger.debug(f"Renderer for {self.model_name}/{self.mode.value}: using template '{final_template_name}'")
         context_dict = {
             "request": self.request, "user": self.user,
-            "SDK_STATIC_URL": STATIC_URL_PATH, "url_for": self.request.url_for
+            "SDK_STATIC_URL": STATIC_URL_PATH, "url_for": self.request.url_for,
+            "ctx": render_context_instance
         }
-        # ...
         if self.mode == RenderMode.TABLE_CELL:
-            # ...
-            context_dict.update({
-                "field_ctx": render_context_instance.fields[0] if render_context_instance.fields else None,
-                "item": render_context_instance.item,
-                "model_name": render_context_instance.model_name
-            })
+            context_dict["field_ctx"] = render_context_instance.fields[0] if render_context_instance.fields else None
+            context_dict["item"] = render_context_instance.item
         elif self.mode == RenderMode.LIST_ROWS:
-            # ...
-            context_dict.update({
-                "items": render_context_instance.items,
-                "model_name": render_context_instance.model_name,
-                "ctx": render_context_instance,
-                "table_key": render_context_instance.table_key or render_context_instance.model_name.lower()
-            })
-        else: # VIEW, EDIT, CREATE, LIST, FILTER_FORM
-            context_dict["ctx"] = render_context_instance
-
+            context_dict["items"] = render_context_instance.items
         return final_template_name, context_dict
 
-    async def render_to_response(self, status_code: int = 200): # Без изменений
-        # ...
+
+    async def render_to_response(self, status_code: int = 200):
+        # ... (как было) ...
         try:
             template_name, context_dict = await self.prepare_response_data()
             return self.templates.TemplateResponse(template_name, context_dict, status_code=status_code)
         except RenderingError as e:
             raise HTTPException(status_code=getattr(e, 'status_code', 500), detail=str(e))
         except Exception as e:
-            logger.exception(f"Error in render_to_response for {self.model_name}, mode {self.mode}")
+            logger.exception(f"Error in render_to_response for {self.model_name}, mode {self.mode.value}")
             raise HTTPException(status_code=500, detail=f"Internal server error during rendering: {str(e)}")
 
 
-    async def render_field_to_response(self, field_name: str, status_code: int = 200): # Без изменений
-        # ...
+    async def render_field_to_response(self, field_name: str, status_code: int = 200):
+        # ... (как было, но self.item теперь всегда нужного типа или None) ...
         try:
             field_render_ctx = await self.get_render_context_for_field(field_name)
             if not field_render_ctx:
                 raise RenderingError(f"Field '{field_name}' not found for rendering.", status_code=404)
-
             template_name = field_render_ctx.template_path
-            if self.mode == RenderMode.EDIT: # Если мы в режиме редактирования поля (inline)
+            if self.mode == RenderMode.EDIT and field_render_ctx.mode == RenderMode.EDIT: # mode поля тоже EDIT
                 template_name = "fields/_inline_input_wrapper.html"
-
+            full_render_ctx = await self.get_render_context() # Получаем полный RenderContext
             context_dict = {
                 "request": self.request, "user": self.user, "SDK_STATIC_URL": STATIC_URL_PATH,
                 "url_for": self.request.url_for, "field_ctx": field_render_ctx,
-                "item_id": self.item_id, "model_name": self.model_name, "item": self.item
+                "item_id": self.item_id, "model_name": self.model_name, "item": self.item,
+                "ctx": full_render_ctx
             }
             return self.templates.TemplateResponse(template_name, context_dict, status_code=status_code)
         except RenderingError as e:

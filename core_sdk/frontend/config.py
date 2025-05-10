@@ -28,7 +28,7 @@ DEFAULT_FIELD_TYPE_MAPPING: Dict[type | str, str] = {
     str: "text",
     int: "number",
     float: "number",
-    bool: "checkbox",
+    bool: "switch",
     Any: "text", # По умолчанию для Any
     "UUID": "text", # UUID часто отображается как текст (иногда ссылка)
     "datetime": "datetime",
@@ -58,11 +58,11 @@ DEFAULT_FIELD_TEMPLATES: Dict[str, Dict[str, str]] = {
         "create": "fields/number_input.html",
         "table": "fields/text_table.html",
     },
-     "checkbox": {
-        "view": "fields/checkbox_view.html",
-        "edit": "fields/checkbox_input.html",
-        "create": "fields/checkbox_input.html",
-        "table": "fields/checkbox_table.html",
+     "switch": { # <--- НОВЫЙ/ОБНОВЛЕННЫЙ ТИП
+        "view": "fields/switch_view.html",
+        "edit": "fields/switch_input.html",
+        "create": "fields/switch_input.html",
+        "table": "fields/switch_table.html",
     },
     "select": { # Для Enum или Choices
         "view": "fields/text_view.html", # Отображаем выбранное значение

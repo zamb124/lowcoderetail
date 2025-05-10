@@ -1,17 +1,27 @@
 {# core_sdk/frontend/templates/components/_table_cell.html #}
+{# Ожидает в контексте: field_ctx, item, model_name, request, user, url_for, SDK_STATIC_URL, ctx (полный RenderContext) #}
+{# (ViewRenderer.prepare_response_data для TABLE_CELL добавляет field_ctx и item в верхний уровень контекста) #}
+
 {% set cell_id = "cell-" ~ model_name ~ "-" ~ item.id ~ "-" ~ field_ctx.name %}
+
+{# Определяем, является ли это поле само по себе интерактивным для обновления (как свитчер) #}
+{% set is_self_updating_field = (field_ctx.field_type == "switch" and not field_ctx.is_readonly and field_ctx.extra.get('editable_in_table', field_ctx.extra.get('editable', True))) %}
+
 <td id="{{ cell_id }}"
-    {% if field_ctx.extra.get('editable', true) and not field_ctx.is_readonly %}
+    {% if not is_self_updating_field and field_ctx.extra.get('editable', True) and not field_ctx.is_readonly %}
     hx-get="{{ url_for('get_inline_edit_field', model_name=model_name, item_id=item.id, field_name=field_ctx.name) }}"
     hx-trigger="click"
     hx-target="#{{ cell_id }}"
     hx-swap="innerHTML"
     class="editable-cell"
-    title="Кликните для редактирования"
+    title="Кликните для редактирования: {{ field_ctx.label }}"
     style="cursor: pointer;"
-    {# Этот атрибут будет прочитан в app.js #}
     data-autofocus-target="#{{ field_ctx.html_id }}--inline-input"
     {% endif %}
     >
-    {% include field_ctx.template_path with context %}
+    {# field_ctx.template_path указывает на шаблон для отображения значения поля (например, text_table.html, switch_table.html) #}
+    {# Передаем field_ctx, item, model_name и т.д. явно, чтобы шаблон поля их получил #}
+    {% with field_ctx=field_ctx, item=item, model_name=model_name, request=request, user=user, url_for=url_for, SDK_STATIC_URL=SDK_STATIC_URL, ctx=ctx %}
+        {% include field_ctx.template_path %}
+    {% endwith %}
 </td>

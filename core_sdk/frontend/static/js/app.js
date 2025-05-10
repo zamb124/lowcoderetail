@@ -22,7 +22,7 @@ class App {
                 simplebar: '[data-simplebar]',
                 tooltip: '[data-bs-toggle="tooltip"]',
                 popover: '[data-bs-toggle="popover"]',
-                choicesjs: 'select[data-control="select2"][data-load-options-url]',
+                choicesjs: 'select[data-control="choicesjs"][data-load-options-url]',
                 sidebarContent: '.pc-sidebar .navbar-content',
                 headerNotificationScroll: '.header-notification-scroll',
                 // Селекторы для ThemeManager (кастомайзер)

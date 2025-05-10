@@ -1,36 +1,50 @@
+{# core_sdk/frontend/templates/fields/relation_select.html #}
 {# Ожидает: field_ctx (FieldRenderContext), url_for #}
-{# Базовый select, который будет улучшен JS (TomSelect/Choices.js) #}
 <div class="mb-5 fv-row">
     <label for="{{ field_ctx.html_id }}" class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}">
         {{ field_ctx.label }}
     </label>
     <select class="form-select form-select-solid {% if field_ctx.errors %}is-invalid{% endif %}"
-            {# Атрибуты для JS-инициализации #}
-            data-control="select2" {# Или 'tom-select', 'choices' #}
-            data-placeholder="Выберите {{ field_ctx.label }}..."
-            data-allow-clear="true"
-            {# URL для загрузки опций (JS будет использовать его) #}
+            {# Атрибуты для Choices.js #}
+            data-control="choicesjs"
+            data-placeholder="{{ field_ctx.extra.get('placeholder', 'Выберите ' ~ field_ctx.label ~ '...') }}"
+            data-allow-clear="{{ 'true' if field_ctx.extra.get('allow_clear', True) and not field_ctx.is_required else 'false' }}"
             data-load-options-url="{{ url_for('get_select_options', model_name=field_ctx.extra.relation_model_name) }}"
+            data-search-enabled="{{ field_ctx.extra.get('search_enabled', 'true') }}"
+            data-remove-item-button="{{ field_ctx.extra.get('remove_item_button', 'true') }}"
             id="{{ field_ctx.html_id }}"
             name="{{ field_ctx.html_name }}"
-            {% if field_ctx.is_readonly %}disabled{% endif %}
+            {# {% if field_ctx.is_readonly %}disabled{% endif %} #} {# Choices.js должен подхватить disabled #}
             {% if field_ctx.is_required %}required{% endif %}
             aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors">
-        <option></option> {# Пустая опция для placeholder #}
-        {# Опции будут загружены через JS, но можно предзагрузить текущее значение, если оно есть #}
+
+        {# Предзагрузка текущего значения, если оно есть. #}
+        {# Choices.js сможет его использовать при инициализации. #}
         {% if field_ctx.value %}
-             {# Ищем текущее значение в предзагруженных опциях (если они были) #}
-             {% set found = false %}
-             {% for opt_value, opt_label in field_ctx.options %}
-                 {% if opt_value == field_ctx.value %}
-                     <option value="{{ opt_value }}" selected>{{ opt_label }}</option>
-                     {% set found = true %}
-                 {% endif %}
-             {% endfor %}
-             {# Если не нашли в опциях, добавляем его, чтобы JS мог отобразить #}
-             {% if not found %}
-                 <option value="{{ field_ctx.value }}" selected>{{ field_ctx.value }} (Загрузка...)</option>
-             {% endif %}
+            {# Если field_ctx.options уже содержит текущее значение (например, из _load_options в SDKField), #}
+            {# то оно будет выбрано. Иначе, добавляем его явно. #}
+            {% set current_value_str = field_ctx.value | string %}
+            {% set found_in_options = false %}
+            {% if field_ctx.options %}
+                {% for opt_val, opt_label in field_ctx.options %}
+                    {% if opt_val | string == current_value_str %}
+                        <option value="{{ opt_val }}" selected>{{ opt_label }}</option>
+                        {% set found_in_options = true %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            {% if not found_in_options %}
+                {# Если текущего значения нет в field_ctx.options (которые SDKField._load_options мог загрузить), #}
+                {# добавляем его. TitleResolver на клиенте может позже обновить label, если нужно, #}
+                {# но для Choices.js важно, чтобы <option> существовал для начального значения. #}
+                {# Мы не знаем display_name здесь, поэтому используем ID или "Загрузка..." #}
+                <option value="{{ current_value_str }}" selected>
+                    ID: {{ current_value_str | truncate(8, True, '...') }} (Загрузка названия...)
+                </option>
+            {% endif %}
+        {% else %}
+             <option value=""></option> {# Пустая опция для placeholder, если значение не выбрано #}
         {% endif %}
     </select>
 
@@ -44,15 +58,3 @@
         </div>
     {% endif %}
 </div>
-{# TODO: Добавить JS для инициализации Select2/TomSelect/Choices.js с асинхронной загрузкой #}
-{# Примерно так (в app.js):
-   document.querySelectorAll('[data-control="select2"][data-load-options-url]').forEach(el => {
-       $(el).select2({
-           ajax: {
-               url: el.dataset.loadOptionsUrl,
-               data: function (params) { return { q: params.term }; },
-               processResults: function (data) { return { results: data.map(item => ({id: item.value, text: item.label})) }; }
-           }
-       });
-   });
-#}

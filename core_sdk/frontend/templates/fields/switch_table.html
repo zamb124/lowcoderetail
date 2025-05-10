@@ -1,0 +1,34 @@
+{# core_sdk/frontend/templates/fields/switch_table.html #}
+{# Ожидает: field_ctx, item, model_name, url_for #}
+{# field_ctx.is_readonly определяется в SDKField #}
+{# field_ctx.extra.editable - кастомный флаг, если нужно дополнительное управление редактируемостью #}
+{% set field_is_editable_in_table = not field_ctx.is_readonly and field_ctx.extra.get('editable_in_table', field_ctx.extra.get('editable', True)) %}
+
+<div class="form-check form-switch d-inline-block">
+    <input class="form-check-input input-primary" type="checkbox"
+           role="switch" {# Для доступности #}
+           id="{{ field_ctx.html_id }}--table-switch"
+           name="{{ field_ctx.name }}" {# Имя поля модели, для hx-vals #}
+           {% if field_ctx.value == True %}checked{% endif %}
+           {% if not field_is_editable_in_table %}disabled{% endif %}
+
+           {% if field_is_editable_in_table %}
+           hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item.id, field_name=field_ctx.name) }}"
+           hx-ext="json-enc"
+           {# Отправляем JSON вида {"имя_поля": true/false} #}
+           hx-vals='js:{"{{ field_ctx.name }}": this.checked}'
+           hx-trigger="change"
+           {# Цель - сама ячейка <td>. Ответ от update_inline_field должен быть HTML этой же ячейки с обновленным свитчером. #}
+           hx-target="closest td"
+           hx-swap="innerHTML"
+           hx-indicator="this" {# Показываем индикатор на самом свитчере #}
+           title="Изменить {{ field_ctx.label }}"
+           style="cursor: pointer;"
+           {% else %}
+           title="{{ field_ctx.label }}: {{ 'Включено' if field_ctx.value == True else 'Выключено' }}"
+           {% endif %}
+           >
+    {# Лейбл можно скрыть визуально, если он не нужен рядом со свитчером в таблице, #}
+    {# но оставить для доступности или сделать его маленьким. #}
+    {# <label class="form-check-label visually-hidden" for="{{ field_ctx.html_id }}--table-switch">{{ field_ctx.label }}</label> #}
+</div>

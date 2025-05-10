@@ -1,55 +1,28 @@
+{# core_sdk/frontend/templates/components/view.html #}
 {# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
-<div id="{{ ctx.html_id }}" class="card shadow-sm" ui_key="{{ ctx.model_name }}--{{ ctx.item_id }}" data-lsn="{{ ctx.item.lsn }}">
-    <div class="card-header">
-        <h3 class="card-title">{{ ctx.title }}</h3>
-        <div class="card-toolbar">
-            {% if ctx.can_edit %}
-            <button type="button" class="btn btn-sm btn-primary me-2"
-                    hx-get="{{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                    hx-target="#{{ ctx.html_id }}"
-                    hx-swap="outerHTML">
-                <i class="ki-duotone ki-pencil fs-3"><span class="path1"></span><span class="path2"></span></i>
-                Редактировать
-            </button>
-            {% endif %}
-            {% if ctx.can_delete %}
-            {# Кнопка для открытия модального окна подтверждения #}
-             <button type="button" class="btn btn-sm btn-light-danger"
-                     hx-get="{{ url_for('get_confirm_delete_modal', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                     hx-target="#modal-placeholder" {# Загружаем модалку в плейсхолдер #}
-                     hx-swap="innerHTML"
-                     >
-                 <i class="ki-duotone ki-trash fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
-                 Удалить
-             </button>
-            {% endif %}
-             {# Кнопка "Назад" к списку (пример) #}
-             <button type="button" class="btn btn-sm btn-light ms-2"
-                     hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}"
-                     hx-target="#main-content-area" {# Цель - основная область контента #}
-                     hx-push-url="/{{ ctx.model_name | lower }}s"> {# Обновляем URL #}
-                 Назад к списку
-             </button>
-        </div>
-    </div>
-    <div class="card-body">
-        {# Отображение общих ошибок, если есть #}
-        {% if ctx.errors and ctx.errors._form %}
-            <div class="alert alert-danger">
-                <ul>
-                {% for error in ctx.errors._form %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
+{# Этот шаблон НЕ содержит обертки card или кнопок действий. #}
+{# Он для включения в .modal-body или другой контейнер. #}
 
-        {# Отображение полей в режиме просмотра #}
-        {% for field_ctx in ctx.fields %}
-            {% include field_ctx.template_path with context %} {# template_path уже содержит путь к _view.html #}
-        {% endfor %}
-    </div>
-</div>
+{# Заголовок, если нужен специфичный (обычно заголовок модалки или страницы выше) #}
+{# <h3 class="mb-5">{{ ctx.title }}</h3> #}
 
-{# Плейсхолдер для модальных окон, загружаемых через HTMX #}
-<div id="modal-placeholder"></div>
+{% if ctx.errors and ctx.errors._form %} {# Ошибки здесь маловероятны для view, но на всякий случай #}
+    <div class="alert alert-danger">
+        <span>
+            {% if ctx.errors._form is iterable and ctx.errors._form is not string %}
+                {{ ctx.errors._form | join('<br>') | safe }}
+            {% else %}
+                {{ ctx.errors._form | safe }}
+            {% endif %}
+        </span>
+    </div>
+{% endif %}
+
+{% for field_ctx_loopvar in ctx.fields %}
+    {# Передаем полный контекст, чтобы шаблоны полей имели доступ ко всему, если нужно #}
+    {% with field_ctx=field_ctx_loopvar, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for, ctx=ctx %}
+        {% include field_ctx_loopvar.template_path %}
+    {% endwith %}
+{% endfor %}
+
+{# Кнопки "Редактировать", "Удалить", "Назад" теперь должны быть предоставлены ВНЕ этого шаблона. #}

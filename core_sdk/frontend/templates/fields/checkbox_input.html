@@ -1,13 +1,14 @@
+{# core_sdk/frontend/templates/fields/checkbox_input.html #}
 {# Ожидает: field_ctx (FieldRenderContext) #}
 <div class="mb-5 fv-row">
     <div class="form-check form-check-custom form-check-solid">
-        {# Скрытое поле для отправки 'false', если чекбокс не отмечен #}
-        <input type="hidden" name="{{ field_ctx.html_name }}" {% if not field_ctx.value == None %} {% if field_ctx.value==True %}value="true"{% else %} value="false" {% endif %}{% endif %}>
+        {# --- УДАЛЕНО СКРЫТОЕ ПОЛЕ --- #}
         <input class="form-check-input" type="checkbox"
-               {% if not field_ctx.value == None %} {% if field_ctx.value==True %}value="true"{% else %} value="false" {% endif %}{% endif %}{# Значение, отправляемое при отметке #}
+               value=true {# ВАЖНО: отправляем "true" как строку, если отмечен #}
+                           {# Pydantic на бэкенде сможет преобразовать "true" в bool #}
                id="{{ field_ctx.html_id }}"
                name="{{ field_ctx.html_name }}"
-               {% if field_ctx.value %}checked{% endif %}
+               {% if field_ctx.value == True %}checked{% endif %} {# Явная проверка на True #}
                {% if field_ctx.is_readonly %}disabled{% endif %}
                aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors"
                />
@@ -20,7 +21,7 @@
         <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
     {% endif %}
      {% if field_ctx.errors %}
-        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback d-block mt-1"> {# d-block нужен для показа #}
+        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback d-block mt-1">
             {{ field_ctx.errors | join(', ') }}
         </div>
     {% endif %}

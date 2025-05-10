@@ -16,39 +16,39 @@
 {% endfor %}
 <td class="text-end">
     {# Кнопка Просмотр #}
+    {% set view_content_url = url_for('get_view', model_name=model_name, item_id=item.id) %}
     <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
        title="Просмотр {{ model_name }}"
-       hx-get="{{ url_for('get_view', model_name=model_name, item_id=item.id) }}"
-       hx-target="#modal-placeholder" {# <--- ИЗМЕНЕНИЕ: Цель - модальный плейсхолдер #}
-       hx-swap="innerHTML" {# <--- ИЗМЕНЕНИЕ: Заменяем содержимое плейсхолдера #}
-       {# hx-push-url можно убрать, если просмотр в модалке не должен менять URL страницы #}
-       {# или оставить, если это желаемое поведение #}
+       hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-lg"
+       hx-target="#modal-placeholder" {# Или #modal-placeholder-{{ loop.index0 }} для матрешки #}
+       hx-swap="innerHTML"
        hx-indicator="closest tr">
         <i class="ti ti-eye f-20"></i>
     </a>
 
     {# Кнопка Редактировать #}
     {% if ctx.can_edit %}
+        {% set edit_content_url = url_for('get_edit_form', model_name=model_name, item_id=item.id) %}
         <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
            title="Редактировать {{ model_name }}"
-           hx-get="{{ url_for('get_edit_form', model_name=model_name, item_id=item.id) }}"
-           hx-target="#modal-placeholder" {# Загружаем форму редактирования в модальное окно #}
+           hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ edit_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-lg"
+           hx-target="#modal-placeholder"
            hx-swap="innerHTML"
            hx-indicator="closest tr">
             <i class="ti ti-edit f-20"></i>
         </a>
     {% endif %}
 
-    {# Кнопка Удалить #}
-
+    {# Кнопка Удалить (остается как есть, загружает _confirm_delete_modal.html) #}
+    {% if ctx.can_delete %}
         <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
            title="Удалить {{ model_name }}"
            hx-get="{{ url_for('get_confirm_delete_modal', model_name=model_name, item_id=item.id) }}"
-           hx-target="#modal-placeholder" {# Загружаем модалку подтверждения #}
+           hx-target="#modal-placeholder"
            hx-swap="innerHTML"
            hx-indicator="closest tr">
             <i class="ti ti-trash f-20"></i>
         </a>
-
+    {% endif %}
 </td>
 </tr>

@@ -25,18 +25,17 @@
 {# --- Для Checkbox --- #}
 {% if field_ctx.field_type == 'checkbox' %}
 <div class="form-check form-check-custom form-check-solid form-check-sm d-inline-block">
-    <input type="hidden" name="{{ field_ctx.html_name }}" value="false">
-    <input class="form-check-input" type="checkbox" value="true"
-           id="{{ field_ctx.html_id }}--inline-input" {# Уникальный ID для самого инпута #}
+    <input class="form-check-input" type="checkbox" value="true" {# Отправляем "true" #}
+           id="{{ field_ctx.html_id }}--inline-input"
            name="{{ field_ctx.html_name }}"
-           {% if field_ctx.value %}checked{% endif %}
+           {% if field_ctx.value == True %}checked{% endif %}
            {% if field_ctx.is_readonly %}disabled{% endif %}
            hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
+           hx-ext="json-enc"
            hx-trigger="change"
            hx-target="closest td"
            hx-swap="innerHTML"
            hx-indicator="closest td"
-           {# autofocus для чекбокса может быть не нужен, но не повредит #}
            autofocus>
 </div>
 {# --- Для Select (Enum) --- #}
@@ -46,6 +45,7 @@
         name="{{ field_ctx.html_name }}"
         {% if field_ctx.is_readonly %}disabled{% endif %}
         hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
+        hx-ext="json-enc" {# <--- ДОБАВЛЕНО ЗДЕСЬ #}
         hx-trigger="change"
         hx-target="closest td" hx-swap="innerHTML" hx-indicator="closest td"
         autofocus>
@@ -64,6 +64,7 @@
        {% if field_ctx.is_required %}required{% endif %}
        placeholder="{{ field_ctx.label }}"
        hx-put="{{ url_for('update_inline_field', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
+       hx-ext="json-enc" {# <--- ДОБАВЛЕНО ЗДЕСЬ #}
        hx-trigger="blur, keyup[key=='Enter']"
        hx-target="closest td"
        hx-swap="innerHTML"
@@ -72,7 +73,7 @@
 {% endif %}
 
 {% if field_ctx.errors %}
-    <div class="invalid-feedback d-block mt-1 fs-sm">
-        {{ field_ctx.errors | join(', ') }}
+    <div style="color: red; font-size: 0.8em; border: 1px solid red; padding: 2px; display: block !important;">
+        ОШИБКА: {{ field_ctx.errors | join(', ') }}
     </div>
 {% endif %}

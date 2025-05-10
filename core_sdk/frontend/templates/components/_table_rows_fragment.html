@@ -1,22 +1,21 @@
 {# core_sdk/frontend/templates/components/_table_rows_fragment.html #}
-{# Ожидает: items, model_name, ctx (RenderContext с pagination), request, user, table_key #}
+{# Ожидает в контексте: items, ctx (RenderContext), request, user, url_for, SDK_STATIC_URL #}
+{# (ViewRenderer.prepare_response_data для LIST_ROWS добавляет items и ctx в верхний уровень контекста) #}
 
 {% if items %}
-    {% for item in items %}
+    {% for current_item_loopvar in items %} {# Используем current_item_loopvar во избежание конфликта с item из внешнего with, если он есть #}
         {% set row_hx_attrs = {} %}
         {% if loop.last and ctx.pagination and ctx.pagination.next_cursor %}
-            {# Формируем базовый URL для подгрузки строк #}
-            {% set base_next_url = url_for('get_list_rows', model_name=model_name) %}
-            {# hx-vals будет содержать только параметры пагинации #}
+            {% set base_next_url = url_for('get_list_rows', model_name=ctx.model_name) %}
             {% set hx_vals_dict = {
                 "cursor": ctx.pagination.next_cursor,
-                "limit": ctx.pagination.limit
+                "limit": ctx.pagination.limit,
+                "direction": ctx.pagination.direction
             } %}
-            {# ID формы фильтров #}
-            {% set filter_form_id = '#filter--' ~ table_key %}
+            {% set filter_form_id = ctx.filter_form_id %} {# Берем из ctx #}
             {% set row_hx_attrs = {
                 "hx-get": base_next_url,
-                "hx-include": filter_form_id,
+                "hx-include": "#" ~ filter_form_id if filter_form_id else "none",
                 "hx-vals": hx_vals_dict|tojson,
                 "hx-trigger": "revealed",
                 "hx-swap": "afterend",
@@ -24,13 +23,15 @@
             } %}
         {% endif %}
 
-        {# Используем with для передачи переменных в include #}
+        {# Передаем все необходимые переменные в _table_row.html #}
         {% with
-            item=item,
-            model_name=model_name,
+            item=current_item_loopvar,
+            model_name=ctx.model_name,
             fields=ctx.fields,
             request=request,
             user=user,
+            url_for=url_for,
+            SDK_STATIC_URL=SDK_STATIC_URL,
             ctx=ctx,
             row_hx_attrs=row_hx_attrs
         %}

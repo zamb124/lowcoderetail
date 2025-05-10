@@ -36,7 +36,7 @@ class UserBase(SQLModel):
     company_id: Optional[uuid.UUID] = Field(
         default=None,
         description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL).",
-        rel='Company'
+        rel='company'
     )
 
 # Схема для создания нового пользователя
@@ -73,7 +73,8 @@ class UserUpdate(SQLModel):
     )
     company_id: Optional[uuid.UUID] = Field(
         default=None,
-        description="Новый идентификатор компании пользователя."
+        description="Новый идентификатор компании пользователя.",
+        rel='company'
     )
 
 # Схема для чтения данных пользователя (возвращается API) - без пароля

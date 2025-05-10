@@ -1,0 +1,29 @@
+{# core_sdk/frontend/templates/components/form_modal_content.html #}
+{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
+{# Этот шаблон предназначен для включения ВНУТРЬ тега <form> в .modal-body #}
+
+{# Отображение общих ошибок формы #}
+{% if ctx.errors and ctx.errors._form %}
+    <div class="alert alert-danger d-flex align-items-center p-4 mb-7">
+        <i class="ki-duotone ki-information-5 fs-2hx text-danger me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+        <div class="d-flex flex-column">
+            <h5 class="mb-1 text-danger">Ошибка сохранения</h5>
+            <span>
+                {% if ctx.errors._form is iterable and ctx.errors._form is not string %}
+                    {{ ctx.errors._form | join('<br>') | safe }}
+                {% else %}
+                    {{ ctx.errors._form | safe }}
+                {% endif %}
+            </span>
+        </div>
+    </div>
+{% endif %}
+
+{# Отображение полей #}
+{% for field_ctx_loopvar in ctx.fields %}
+     {% set field_errors = ctx.errors.get(field_ctx_loopvar.name) if ctx.errors and ctx.errors is mapping else None %}
+     {% set current_field_ctx = field_ctx_loopvar.model_copy(update={'errors': field_errors}) %}
+     {% with field_ctx=current_field_ctx, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+        {% include current_field_ctx.template_path %}
+     {% endwith %}
+{% endfor %}

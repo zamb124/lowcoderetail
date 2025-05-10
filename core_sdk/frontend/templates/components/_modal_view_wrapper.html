@@ -29,3 +29,35 @@
         {% endif %}
     </div>
 {% endblock %}
+{% block modal_footer_buttons %} {# Переопределяем блок из _modal_wrapper #}
+    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
+    {% if ctx.can_edit %}
+    <button type="button" class="btn btn-primary"
+            hx-get="{{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
+            {# Цель - заменить .modal-body текущей модалки на форму редактирования #}
+            hx-target="closest .modal-content .modal-body"
+            {# Или hx-target="#{{ modal_id }}-content .modal-body" #}
+            hx-swap="innerHTML"
+            {# Также нужно обновить заголовок и футер модалки, если они меняются #}
+            {# Можно сделать hx-target на .modal-content и вернуть HTML для всего .modal-content #}
+            {# Чтобы обновить и заголовок, и футер, и тело: #}
+            {# hx-target="closest .modal-content" #}
+            {# hx-vals='{"_modal_title": "Редактирование: {{ ctx.model_name }}"}' #} {# Не сработает так просто #}
+            {# Проще, если get_edit_form вернет HTML для .modal-body + .modal-footer, #}
+            {# а hx-target будет на .modal-body, и мы также обновим заголовок через HX-Trigger или JS. #}
+
+            {# Самый простой вариант: get_edit_form возвращает ТОЛЬКО форму, #}
+            {# а мы заменяем только .modal-body. Футер и заголовок остаются от просмотра. #}
+            {# Это не идеально, т.к. кнопки в футере могут быть не те. #}
+
+            {# Лучше: кнопка "Редактировать" загружает НОВУЮ модалку с формой редактирования #}
+            {# поверх текущей (если нужна матрешка) или заменяет текущую. #}
+            {# Для замены текущей: #}
+            hx-get="{{ url_for('get_modal_wrapper', content_url=url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id), modal_title='Редактирование: ' ~ ctx.model_name, modal_size='modal-xl') }}"
+            hx-target="#modal-placeholder" {# Заменяем всю модалку в главном плейсхолдере #}
+            hx-swap="innerHTML"
+            >
+        Редактировать
+    </button>
+    {% endif %}
+{% endblock %}
