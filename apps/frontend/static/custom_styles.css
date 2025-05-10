@@ -55,6 +55,12 @@
     padding-bottom: 0.625rem;/* Отступ снизу */
     line-height: 1.25;     /* Стандартный для form-floating */
 }
+.choices.is-disabled {
+    margin-bottom: 0;
+}
+.choices{
+    margin-bottom: 0 !important;
+}
 
 .choices.is-disabled .choices__inner {
     background-color: var(--bs-secondary-bg, #e9ecef) !important;
@@ -329,4 +335,60 @@ label .ti-info-circle {
     cursor: help;
     font-size: 0.9em;
     vertical-align: middle;
+}
+
+/* custom_styles.css */
+/* ... */
+
+.choices__list--dropdown,
+.choices__list[aria-expanded] { /* aria-expanded добавляется, когда список открыт */
+    border-radius: 12px !important;
+    border-color: var(--bs-border-color, #dee2e6) !important;
+    background-color: var(--bs-body-bg, #fff);
+    /* Устанавливаем очень высокий z-index, чтобы быть поверх большинства элементов, включая модалки Bootstrap */
+    z-index: 1070 !important; /* Bootstrap модалки обычно до ~1055, popover ~1070. Можно и больше, например, 2000 или 9999. */
+    font-size: 0.875rem;
+    /* Дополнительно, чтобы избежать обрезки, если возможно: */
+    /* position: fixed; */ /* Это может изменить позиционирование относительно viewport, а не поля ввода. Требует аккуратной настройки top/left через JS. */
+    /* width: auto; */ /* Чтобы ширина подстраивалась под контент или ширину поля */
+    /* min-width: 200px; */ /* Минимальная ширина */
+}
+
+/* Для одиночного выбора, когда removeItemButton: true */
+.choices[data-type*="select-one"] .choices__button {
+    /* Стилизуем стандартную кнопку удаления Choices.js, чтобы она выглядела как крестик справа */
+    background-image: url('data:image/svg+xml;charset=UTF-8,<svg fill="%23000" stroke="%23000" stroke-width=".1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18.3 5.71a.996.996 0 00-1.41 0L12 10.59 7.11 5.7A.996.996 0 105.7 7.11L10.59 12 5.7 16.89a.996.996 0 101.41 1.41L12 13.41l4.89 4.89a.996.996 0 101.41-1.41L13.41 12l4.89-4.89c.38-.38.38-1.02 0-1.4z"/></svg>');
+    background-size: 10px 10px; /* Размер иконки */
+    width: 18px;
+    height: 18px;
+    position: absolute;
+    top: 50%;
+    right: 5px; /* Отступ справа */
+    transform: translateY(-50%);
+    margin-top: 0;
+    margin-left: 0;
+    border-left: none;
+    opacity: 0.5;
+    z-index: 2;
+}
+.choices[data-type*="select-one"] .choices__button:hover {
+    opacity: 1;
+}
+.choices__clear-button {
+    /* Стили для вашей кнопки "x" */
+    padding: 0.1rem 0.3rem;
+    line-height: 1;
+    background: transparent;
+    border: none;
+    opacity: 0.5;
+}
+.choices__clear-button:hover {
+    opacity: 1;
+}
+.choices__inner { /* Может понадобиться немного больше padding-right, чтобы кнопка не наезжала на текст */
+    padding-right: 2.5rem !important; /* Пример */
+}
+/* Может понадобиться сдвинуть текст выбранного элемента, чтобы не наезжал на кнопку */
+.choices[data-type*="select-one"] .choices__item[data-value] {
+    padding-right: 25px !important; /* Добавить отступ для кнопки */
 }

@@ -77,10 +77,10 @@ DEFAULT_FIELD_TEMPLATES: Dict[str, Dict[str, str]] = {
         "table": "fields/relation_table.html", # Может быть ссылкой
     },
     "list_relation": { # Связь один-ко-многим / многие-ко-многим
-        "view": "fields/list_relation_view.html", # Список ссылок или таблица
-        "edit": "fields/list_relation_widget.html", # Виджет (например, мультиселект или таблица)
-        "create": "fields/list_relation_widget.html",
-        "table": "fields/list_relation_table.html", # Количество или краткий список
+        "view": "fields/list_relation_view.html",
+        "edit": "fields/list_relation_select.html",
+        "create": "fields/list_relation_select.html",
+        "table": "fields/list_relation_table.html",
     },
     # --- НОВЫЕ ТИПЫ ДЛЯ ДАТЫ/ВРЕМЕНИ ---
     "datetime": {

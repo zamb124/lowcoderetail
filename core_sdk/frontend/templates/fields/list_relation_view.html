@@ -1,37 +1,41 @@
 {# core_sdk/frontend/templates/fields/list_relation_view.html #}
-<div class="mb-3"> {# Не form-floating, а просто mb-3 #}
-    <label class="form-label fs-6 fw-semibold text-muted">{{ field_ctx.label }}</label>
-    <div class="ps-1"> {# Небольшой отступ для содержимого #}
-        {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string %}
+{# Ожидает: field_ctx, url_for, request, ctx #}
+{# field_ctx.value здесь - это список UUID #}
+
+<div class="mb-3"> {# Не используем form-floating для списка тегов/ссылок #}
+    <label class="form-label fs-6 fw-semibold text-muted d-block"> {# d-block чтобы занимал всю ширину #}
+        {{ field_ctx.label }}
+        {% if field_ctx.description %}
+            <i class="ti ti-info-circle ms-1 text-muted align-middle" style="cursor: help; font-size: 0.9em;"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               data-bs-container="{{ '#' ~ ctx.extra.modal_container_id if ctx and ctx.extra and ctx.extra.modal_container_id else 'body' }}"
+               title="{{ field_ctx.description | escape }}"></i>
+        {% endif %}
+    </label>
+    <div class="ps-1 mt-1">
+        {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string and field_ctx.value | length > 0 %}
             {% set related_model_name = field_ctx.extra.relation_model_name %}
-            {% if field_ctx.value %}
-            <ul class="list-unstyled mb-0">
-                {% for id_or_obj in field_ctx.value %}
-                    {% set item_id_val = id_or_obj.id if id_or_obj is mapping and id_or_obj.id else (id_or_obj if id_or_obj is not mapping) %}
-                    {% set display_text = id_or_obj.name if id_or_obj is mapping and id_or_obj.name else (id_or_obj.title if id_or_obj is mapping and id_or_obj.title else (item_id_val | string | truncate(12, True, '...'))) %}
+            {# Отображаем как теги или просто список ссылок #}
+            <div class="d-flex flex-wrap gap-2">
+                {% for item_id_val_loop in field_ctx.value %}
+                    {% set item_id_val = item_id_val_loop.id if item_id_val_loop is mapping and item_id_val_loop.id else item_id_val_loop %}
                     {% if item_id_val %}
-                        <li class="mb-1">
-                            <a href="#" class="fw-bold text-primary text-hover-warning needs-title-resolution"
-                               data-model-name="{{ related_model_name }}"
-                               data-item-id="{{ item_id_val }}"
-                               hx-get="{{ url_for('get_modal_wrapper', content_url=url_for('get_view', model_name=related_model_name, item_id=item_id_val), modal_title='Просмотр: ' ~ related_model_name, modal_size='modal-xl') }}"
-                               hx-target="#modal-placeholder"
-                               hx-swap="innerHTML">
-                                {{- display_text if display_text != item_id_val|string|truncate(12, True, '...') else item_id_val|string|truncate(12, True, '...') -}}
-                                {% if display_text == item_id_val|string|truncate(12, True, '...') and item_id_val %}(Загрузка...){% endif %}
-                            </a>
-                        </li>
+                        <span class="badge badge-light-primary fs-7 needs-title-resolution"
+                              data-model-name="{{ related_model_name }}"
+                              data-item-id="{{ item_id_val }}"
+                              style="cursor: default;" {# Не делаем кликабельным сам тег, если не хотим открывать модалку отсюда #}
+                              title="ID: {{ item_id_val }}">
+                            {{- item_id_val | string | truncate(12, True, '...') -}}
+                            {# Можно добавить ссылку внутрь тега, если нужно #}
+                            {# <a href="#" hx-get="{{ url_for('get_modal_wrapper', content_url=url_for('get_view', model_name=related_model_name, item_id=item_id_val), ... ) }}" ...> #}
+                            {# {{ item_id_val | string | truncate(12, True, '...') }} #}
+                            {# </a> #}
+                        </span>
                     {% endif %}
                 {% endfor %}
-            </ul>
-            {% else %}
-            <span class="text-muted">Нет выбранных элементов</span>
-            {% endif %}
+            </div>
         {% else %}
-            <span class="text-muted">Не указано</span>
+            <span class="text-muted fst-italic">Нет выбранных элементов</span>
         {% endif %}
     </div>
-    {% if field_ctx.description %}
-        <div class="form-text text-muted mt-1 ps-1">{{ field_ctx.description }}</div>
-    {% endif %}
 </div>

@@ -34,12 +34,14 @@ class DefaultFilter(BaseFilter):
     company_id: Optional[UUID] = Field(
         default=None,
         title='Filter by Company ID',
-        description='Filter by a specific company ID.'
+        description='Filter by a specific company ID.',
+        rel='company' # Указываем связь с моделью Company
     )
     company_id__in: Optional[List[UUID]] = Field(
         default=None,
         title='Filter by Company ID list',
-        description='Filter by a list of company IDs.'
+        description='Filter by a list of company IDs.',
+        rel='company'
     )
     created_at__gte: Optional[datetime] = Field(
         default=None,

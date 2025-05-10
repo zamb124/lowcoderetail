@@ -8,7 +8,7 @@
             data-search-enabled="{{ field_ctx.extra.get('search_enabled', 'true') }}"
             id="{{ field_ctx.html_id }}"
             name="{{ field_ctx.html_name }}"
-            {% if field_ctx.is_readonly %}disabled{% endif %}
+{#            {% if field_ctx.is_readonly %}disabled{% endif %}#}
             {% if field_ctx.is_required %}required{% endif %}
             aria-label="{{ field_ctx.label }}"
             aria-describedby="{{ field_ctx.html_id }}_errors">

@@ -114,7 +114,7 @@ class SDKField:
                 logger.debug(f"  Type set to 'uuid_with_title_resolution' for model '{related_model_for_id_resolution}'")
             elif is_list_type(annotation):
                 list_item_b_type = get_list_item_type(annotation)
-                if list_item_b_type is uuid.UUID or getattr(list_item_b_type, '__name__', '') == "UUID":
+                if (list_item_b_type is uuid.UUID or getattr(list_item_b_type, '__name__', '') == "UUID") and self.name not in ['id', 'id__in']:
                     field_render_type = "list_relation"
                     self.config["relation_model_name"] = related_model_for_id_resolution.lower()
                     logger.debug(f"  Type set to 'list_uuid_with_title_resolution' for model '{related_model_for_id_resolution}'")
