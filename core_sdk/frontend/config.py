@@ -82,11 +82,24 @@ DEFAULT_FIELD_TEMPLATES: Dict[str, Dict[str, str]] = {
         "create": "fields/list_relation_widget.html",
         "table": "fields/list_relation_table.html", # Количество или краткий список
     },
+    # --- НОВЫЕ ТИПЫ ДЛЯ ДАТЫ/ВРЕМЕНИ ---
     "datetime": {
         "view": "fields/datetime_view.html",
         "edit": "fields/datetime_input.html",
         "create": "fields/datetime_input.html",
         "table": "fields/datetime_table.html",
+    },
+    "date": {
+        "view": "fields/date_view.html",
+        "edit": "fields/date_input.html",
+        "create": "fields/date_input.html",
+        "table": "fields/date_table.html",
+    },
+    "time": {
+        "view": "fields/time_view.html",
+        "edit": "fields/time_input.html",
+        "create": "fields/time_input.html",
+        "table": "fields/time_table.html",
     },
     # ... другие типы ...
     "default": { # Шаблон по умолчанию, если тип не найден

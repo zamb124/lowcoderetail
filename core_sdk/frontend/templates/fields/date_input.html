@@ -1,21 +1,18 @@
-{# core_sdk/frontend/templates/fields/datetime_input.html #}
+{# core_sdk/frontend/templates/fields/date_input.html #}
 {# Ожидает: field_ctx #}
-{# Используем datetime-local, который ожидает значение в формате YYYY-MM-DDTHH:MM #}
 {% set current_value = '' %}
 {% if field_ctx.value and hasattr(field_ctx.value, 'strftime') %}
-    {# Попытка форматировать, если это объект datetime #}
-    {% if field_ctx.value.year > 1 and field_ctx.value.month > 0 %} {# Простая проверка на валидность даты #}
-        {% set current_value = field_ctx.value.strftime('%Y-%m-%dT%H:%M') %}
+    {% if field_ctx.value.year > 1 and field_ctx.value.month > 0 %}
+      {% set current_value = field_ctx.value.strftime('%Y-%m-%d') %}
     {% endif %}
 {% elif field_ctx.value is string and field_ctx.value %}
-    {# Если значение уже строка, пытаемся использовать его, если оно похоже на нужный формат #}
-    {% if field_ctx.value | length > 15 and 'T' in field_ctx.value %}
+    {% if field_ctx.value | length > 8 %} {# Простая проверка на длину строки даты #}
         {% set current_value = field_ctx.value %}
     {% endif %}
 {% endif %}
 
 <div class="form-floating mb-3">
-    <input type="datetime-local"
+    <input type="date"
            class="form-control {% if field_ctx.errors %}is-invalid{% endif %}"
            id="{{ field_ctx.html_id }}"
            name="{{ field_ctx.html_name }}"
