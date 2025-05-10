@@ -3,8 +3,8 @@ import logging
 import uuid
 from typing import Optional, List
 
-from sqlmodel import SQLModel, Field
-
+from sqlmodel import SQLModel
+from pydantic import EmailStr, Field
 # Относительные импорты схем связанных моделей из текущего приложения
 from .user import UserRead
 from .group import GroupRead

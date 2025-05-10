@@ -87,6 +87,7 @@ class ModelRegistry:
         :param read_schema_cls: Опциональная SQLModel/Pydantic схема для операций чтения (если отличается от model_cls).
         :raises TypeError: Если предоставленный `filter_cls` не является подклассом `fastapi_filter.contrib.sqlalchemy.Filter`.
         """
+        model_name = model_name.lower()
         if model_name in cls._registry:
             logger.warning(f"Model name '{model_name}' is already registered. Overwriting previous configuration.")
 
@@ -197,7 +198,7 @@ class ModelRegistry:
         # или импортировать RemoteDataAccessManager, если хотим быть точнее в ModelInfo.
         # Передача Any проще и избегает потенциальных импортов.
         cls.register(
-            model_name=name_to_register,
+            model_name=name_to_register.lower(),
             model_cls=model_cls,
             access_config=config,
             manager_cls=Any, # Фабрика создаст RemoteDataAccessManager на основе access_config
