@@ -5,7 +5,7 @@
 {# используется как базовый для _modal_view_wrapper / _modal_form_wrapper, которые получают ctx #}
 
 <div class="modal fade" tabindex="-1" id="{{ modal_id }}">
-    <div class="modal-dialog {{ modal_size | default('modal-lg') }} modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-dialog {{ modal_size | default('modal-xl') }} modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" id="{{ modal_id }}-content">
             <div class="modal-header">
                 <h5 class="modal-title">{{ modal_title | default("Модальное окно") }}</h5>
@@ -15,7 +15,6 @@
                  hx-get="{{ content_url }}"
                  hx-trigger="load"
                  hx-swap="innerHTML"
-                 {# hx-target="this" # Это уже по умолчанию для hx-get на элементе #}
                  >
                 <div class="text-center p-5"> {# Плейсхолдер загрузки #}
                     <span class="spinner-border text-primary" role="status"></span>
@@ -23,40 +22,16 @@
                 </div>
             </div>
             <div class="modal-footer">
-                {# Кнопки будут зависеть от контента, загруженного в modal-body. #}
-                {# Если form.html или view.html загружены, они НЕ содержат кнопок. #}
-                {# Значит, кнопки должны быть здесь, и они должны знать, что делать. #}
-                {# Это становится сложным, так как _modal_wrapper не знает, форма там или view. #}
-
-                {# РЕШЕНИЕ: Контент, загружаемый в modal-body (form.html или view.html) #}
-                {# должен сам включать свои кнопки в ЕГО СОБСТВЕННЫЙ ФУТЕР (например, card-footer), #}
-                {# а этот modal-footer остается пустым или с общей кнопкой "Закрыть". #}
-
-                {# Давайте вернемся к идее, что form.html и view.html - это ПОЛНЫЕ карточки #}
-                {# с header, body, footer. Тогда _modal_wrapper просто их включает. #}
-                {# Это проще для начала. #}
-
-                {# Если мы хотим кнопки в общем modal-footer: #}
-                {% if ctx and ctx.mode == 'edit' or ctx and ctx.mode == 'create' %}
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-                    <button type="submit" class="btn btn-primary" form="{{ ctx.html_id if ctx else '' }}">Сохранить</button>
-                {% elif ctx and ctx.mode == 'view' %}
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
-                    {% if ctx.can_edit %}
-                    <button type="button" class="btn btn-primary"
-                            hx-get="{{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                            {# Цель - заменить содержимое .modal-body текущей модалки #}
-                            hx-target="#{{ modal_id }}-content .modal-body"
-                            hx-swap="innerHTML"
-                            {# Также нужно обновить футер и заголовок #}
-                            hx-include="this" {# Чтобы передать modal_id, title и т.д. для обновления обертки #}
-                            hx-indicator="self">
-                        Редактировать
-                    </button>
-                    {% endif %}
-                {% else %}
-                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button>
-                {% endif %}
+                {# Этот футер теперь может быть почти пустым, если form.html/view.html #}
+                {# сами управляют своими кнопками. #}
+                {# Оставим только универсальную кнопку "Закрыть", если контент не предоставит свою "Отмену". #}
+                {# Но form.html и view.html теперь имеют свои кнопки "Отмена" с data-bs-dismiss="modal". #}
+                {# Поэтому этот футер может быть полностью пустым. #}
+                {% block modal_footer_buttons %}
+                    {# Пусто, так как form.html и view.html теперь содержат свои кнопки #}
+                    {# Если бы они не содержали, здесь была бы кнопка: #}
+                    {# <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button> #}
+                {% endblock modal_footer_buttons %}
             </div>
         </div>
     </div>

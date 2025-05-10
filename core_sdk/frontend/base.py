@@ -320,7 +320,8 @@ async def get_table_cell_view(renderer: ViewRenderer = Depends(get_table_cell_re
 
 @router.get("/list-rows/{model_name}", response_class=HTMLResponse, name="get_list_rows")
 async def get_list_rows_content(renderer: ViewRenderer = Depends(get_list_rows_renderer)):
-    return await renderer.render_to_response()
+    r = await renderer.render_to_response()
+    return r
 
 @router.get("/filter/{model_name}", response_class=HTMLResponse, name="get_filter_form", include_in_schema=False)
 async def get_filter_form_content(renderer: ViewRenderer = Depends(get_filter_form_renderer)):

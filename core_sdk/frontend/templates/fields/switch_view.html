@@ -1,19 +1,29 @@
-{# core_sdk/frontend/templates/fields/switch_view.html #}
-{# Ожидает: field_ctx (FieldRenderContext) #}
-<div class="mb-3 row">
-    <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
-    <div class="col-lg-8">
-        <span class="fw-bold fs-6 text-gray-800">
-            {% if field_ctx.value == True %}
-                <span class="badge badge-light-success">Включено</span>
-            {% elif field_ctx.value == False %}
-                <span class="badge badge-light-danger">Выключено</span>
-            {% else %}
-                <span class="badge badge-light-secondary">Не задано</span>
+{# core_sdk/frontend/templates/fields/switch_input.html #}
+{# Ожидает: field_ctx #}
+<div class="ms-3 fv-row">
+    <div class="form-check form-switch form-check-custom form-check-solid d-flex align-items-center pt-2 pb-2">
+        <input class="form-check-input input-primary me-2 text-bg-primary" type="checkbox"
+               role="switch"
+               id="{{ field_ctx.html_id }}"
+               name="{{ field_ctx.html_name }}"
+               value="true"
+               {% if field_ctx.value == True %}checked{% endif %}
+               disabled
+               aria-describedby="{{ field_ctx.html_id }}_errors"
+               />
+        <label class="form-check-label fw-semibold" for="{{ field_ctx.html_id }}" style="opacity: 1!important;">
+            {{ field_ctx.label }}
+            {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
+            {% if field_ctx.description %}
+                <i class="ti ti-info-circle ms-1 text-muted align-middle" style="cursor: help; font-size: 0.9em; vertical-align: middle;"
+                   data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="{{ field_ctx.description | escape }}"></i>
             {% endif %}
-        </span>
-         {% if field_ctx.description %}
-            <p class="text-muted fs-7 mt-1">{{ field_ctx.description }}</p>
-         {% endif %}
+        </label>
     </div>
+    {% if field_ctx.errors %}
+        <div class="invalid-feedback d-block mt-1">
+            {{ field_ctx.errors | join(', ') }}
+        </div>
+    {% endif %}
 </div>

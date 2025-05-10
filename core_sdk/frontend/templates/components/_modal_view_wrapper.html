@@ -5,7 +5,7 @@
 {% set modal_id = "modal-view-" ~ ctx.model_name ~ "-" ~ ctx.item_id %}
 {% extends "components/_modal_wrapper.html" %}
 
-{% block modal_size %}modal-lg{% endblock %} {# Размер модального окна для просмотра #}
+{% block modal_size %}modal-xl{% endblock %} {# Размер модального окна для просмотра #}
 
 {% block modal_title %}{{ ctx.title }}{% endblock %}
 

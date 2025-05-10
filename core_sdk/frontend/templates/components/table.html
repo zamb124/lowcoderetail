@@ -3,10 +3,11 @@
 <div class="card shadow-sm"
      id="{{ ctx.html_id }}"
      list-model="{{ ctx.model_name }}"
-     hx-trigger="refreshData from:body"
-     hx-get="{{ url_for('get_list_view', model_name=ctx.model_name) }}?{{ request.url.query }}"
-     hx-target="#{{ ctx.html_id }}"
-     hx-swap="outerHTML">
+     hx-trigger="change from:#filter--{{ ctx.model_name }} delay:500ms, update delay:500ms"
+     hx-get="{{ url_for('get_list_rows', model_name=ctx.model_name) }}"
+     hx-target="#tbody-table--{{ ctx.model_name }}"
+     hx-include="#filter--{{ ctx.model_name }}"
+     >
     <div class="card-header">
         <h3 class="card-title">{{ ctx.title }}</h3>
         <div class="card-toolbar">
@@ -27,7 +28,16 @@
                 <tr class="fw-bold text-muted">
                     {% for field_ctx_proto in ctx.fields %} {# ctx.fields содержит прототипы колонок #}
                         {% if field_ctx_proto.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_ctx_proto.extra.get('table_hidden') %}
-                            <th class="min-w-150px">{{ field_ctx_proto.label }}</th>
+                            <th class="min-w-150px">{{ field_ctx_proto.label }}
+                                {% if field_ctx_proto.description %}
+                                    <span>
+                                    <i class="ti ti-info-circle ms-1 text-muted align-middle"
+                                       style="cursor: help; font-size: 0.9em; vertical-align: middle;"
+                                       data-bs-toggle="tooltip" data-bs-placement="top"
+                                       title="{{ field_ctx_proto.description | escape }}"></i></span>
+                                {% endif %}
+                            </th>
+
                         {% endif %}
                     {% endfor %}
                     <th class="min-w-100px text-end">Действия</th>

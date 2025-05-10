@@ -1,37 +1,37 @@
-{# Ожидает: field_ctx (FieldRenderContext), url_for #}
-{# field_ctx.value здесь - это список ID или список объектов #}
-<div class="mb-3 row">
-    <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
-    <div class="col-lg-8">
+{# core_sdk/frontend/templates/fields/list_relation_view.html #}
+<div class="mb-3"> {# Не form-floating, а просто mb-3 #}
+    <label class="form-label fs-6 fw-semibold text-muted">{{ field_ctx.label }}</label>
+    <div class="ps-1"> {# Небольшой отступ для содержимого #}
         {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string %}
             {% set related_model_name = field_ctx.extra.relation_model_name %}
-            <ul class="list-unstyled">
+            {% if field_ctx.value %}
+            <ul class="list-unstyled mb-0">
                 {% for id_or_obj in field_ctx.value %}
                     {% set item_id_val = id_or_obj.id if id_or_obj is mapping and id_or_obj.id else (id_or_obj if id_or_obj is not mapping) %}
+                    {% set display_text = id_or_obj.name if id_or_obj is mapping and id_or_obj.name else (id_or_obj.title if id_or_obj is mapping and id_or_obj.title else (item_id_val | string | truncate(12, True, '...'))) %}
                     {% if item_id_val %}
-                        <li>
+                        <li class="mb-1">
                             <a href="#" class="fw-bold text-primary text-hover-warning needs-title-resolution"
                                data-model-name="{{ related_model_name }}"
                                data-item-id="{{ item_id_val }}"
-                               hx-get="{{ url_for('get_view', model_name=related_model_name, item_id=item_id_val) }}"
+                               hx-get="{{ url_for('get_modal_wrapper', content_url=url_for('get_view', model_name=related_model_name, item_id=item_id_val), modal_title='Просмотр: ' ~ related_model_name, modal_size='modal-xl') }}"
                                hx-target="#modal-placeholder"
-                               hx-swap="innerHTML"
-                               title="Просмотр {{ related_model_name }} {{ item_id_val }}">
-                                {{- item_id_val|string|truncate(8, True, '...') -}}
+                               hx-swap="innerHTML">
+                                {{- display_text if display_text != item_id_val|string|truncate(12, True, '...') else item_id_val|string|truncate(12, True, '...') -}}
+                                {% if display_text == item_id_val|string|truncate(12, True, '...') and item_id_val %}(Загрузка...){% endif %}
                             </a>
                         </li>
                     {% endif %}
-                {% else %}
-                 <li><span class="text-muted">-</span></li>
                 {% endfor %}
             </ul>
-        {% elif field_ctx.value %} {# Если это одиночное значение, хотя тип list_relation #}
-            <span class="text-muted">Некорректные данные (ожидался список)</span>
+            {% else %}
+            <span class="text-muted">Нет выбранных элементов</span>
+            {% endif %}
         {% else %}
             <span class="text-muted">Не указано</span>
         {% endif %}
-         {% if field_ctx.description %}
-            <p class="text-muted fs-7 mt-1">{{ field_ctx.description }}</p>
-         {% endif %}
     </div>
+    {% if field_ctx.description %}
+        <div class="form-text text-muted mt-1 ps-1">{{ field_ctx.description }}</div>
+    {% endif %}
 </div>

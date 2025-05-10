@@ -19,7 +19,7 @@
     {% set view_content_url = url_for('get_view', model_name=model_name, item_id=item.id) %}
     <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
        title="Просмотр {{ model_name }}"
-       hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-lg"
+       hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-xl"
        hx-target="#modal-placeholder" {# Или #modal-placeholder-{{ loop.index0 }} для матрешки #}
        hx-swap="innerHTML"
        hx-indicator="closest tr">
@@ -31,7 +31,7 @@
         {% set edit_content_url = url_for('get_edit_form', model_name=model_name, item_id=item.id) %}
         <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
            title="Редактировать {{ model_name }}"
-           hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ edit_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-lg"
+           hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ edit_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-xl"
            hx-target="#modal-placeholder"
            hx-swap="innerHTML"
            hx-indicator="closest tr">

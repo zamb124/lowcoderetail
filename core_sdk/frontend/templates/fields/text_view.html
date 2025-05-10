@@ -1,10 +1,19 @@
-{# Ожидает: field_ctx (FieldRenderContext) #}
-<div class="mb-3 row">
-    <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
-    <div class="col-lg-8">
-        <span class="fw-bold fs-6 text-gray-800">{{ field_ctx.value | default('N/A', true) }}</span>
-         {% if field_ctx.description %}
-            <p class="text-muted fs-7 mt-1">{{ field_ctx.description }}</p>
-         {% endif %}
+{# core_sdk/frontend/templates/fields/text_view.html #}
+{# Ожидает: field_ctx #}
+<div class="form-floating mb-3 view-field-wrapper">
+    <div class="form-control-plaintext ps-3 pe-3 pt-3 pb-1" id="{{ field_ctx.html_id }}-view-val"
+         style="min-height: calc(1.5em + {{ field_ctx.extra.get('form_control_padding_y', '0.75rem') }} + 2px); display: flex; align-items: center;">
+        <span>{{ field_ctx.value | default(' '|safe, true) }}</span>
     </div>
+    <label for="{{ field_ctx.html_id }}-view-val" class="text-muted">{{ field_ctx.label }}
+        {% if field_ctx.description %}
+            <span>
+                <i class="ti ti-info-circle ms-1 text-muted align-middle"
+                   style="cursor: help; font-size: 0.9em; vertical-align: middle;"
+                   data-bs-toggle="tooltip" data-bs-placement="top"
+                   title="{{ field_ctx.description | escape }}">
+                </i>
+            </span>
+        {% endif %}
+    </label>
 </div>

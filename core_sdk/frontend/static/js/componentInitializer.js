@@ -34,8 +34,10 @@ class ComponentInitializer {
             if (typeof bootstrap !== 'undefined') {
                 if (bootstrap.Tooltip) {
                     const tooltipTriggerList = Array.from(parentElement.querySelectorAll(this.selectors.tooltip || '[data-bs-toggle="tooltip"]'));
-                    tooltipTriggerList.forEach(el => {
-                        if (!bootstrap.Tooltip.getInstance(el)) new bootstrap.Tooltip(el);
+                    tooltipTriggerList.forEach(tooltipTriggerEl => {
+                        if (!bootstrap.Tooltip.getInstance(tooltipTriggerEl)) { // Проверяем, не создан ли уже
+                            new bootstrap.Tooltip(tooltipTriggerEl);
+                        }
                     });
                 }
                 if (bootstrap.Popover) {
@@ -188,6 +190,7 @@ class ComponentInitializer {
                                 'label', // поле для отображения
                                 false    // НЕ заменять все существующие опции
                             );
+
                         } else if (!forInitialValue) {
                             // Для поиска, устанавливаем новые опции
                             instance.setChoices(data, 'value', 'label', true);

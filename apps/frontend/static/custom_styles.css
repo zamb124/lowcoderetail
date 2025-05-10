@@ -1,0 +1,332 @@
+/* static/css/custom_styles.css */
+
+/* -------------------------------------------------------------- */
+/* 1. Глобальные переменные и переопределения для border-radius  */
+/* -------------------------------------------------------------- */
+:root {
+    /* Bootstrap переменные (если ваша тема их использует) */
+    --bs-border-radius: 20px;
+    --bs-border-radius-lg: 20px;
+    --bs-border-radius-xl: 20px;
+
+    /* Радиус для полей через переменные Bootstrap */
+    --bs-form-control-border-radius: 12px;
+    --bs-form-select-border-radius: 12px;
+    /* Если поля используют --bs-border-radius-sm, то: */
+    /* --bs-border-radius-sm: 12px; */
+}
+
+.card,
+.modal-content, /* .modal-content для скругления всей модалки */
+.dropdown-menu,
+.alert,
+.toast {
+    border-radius: var(--bs-border-radius, 20px) !important;
+}
+
+.form-control,
+.form-select {
+    border-radius: var(--bs-form-control-border-radius, 12px) !important;
+}
+
+/* -------------------------------------------------------------- */
+/* 2. Стили для Choices.js                                      */
+/* -------------------------------------------------------------- */
+.choices__inner {
+    border-radius: var(--bs-form-control-border-radius, 12px) !important;
+    background-color: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    display: flex;
+    align-items: center;
+    width: 100%;
+    /* Размеры и отступы для соответствия .form-control-sm (пример) */
+    min-height: calc(1.5em + 0.5rem + 2px);
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+/* Если Choices.js используется внутри form-floating */
+.form-floating > .choices > .choices__inner {
+    padding-top: 1.625rem;  /* Больший отступ сверху для плавающего лейбла */
+    padding-bottom: 0.625rem;/* Отступ снизу */
+    line-height: 1.25;     /* Стандартный для form-floating */
+}
+
+.choices.is-disabled .choices__inner {
+    background-color: var(--bs-secondary-bg, #e9ecef) !important;
+    opacity: 0.7;
+}
+
+.choices__list--multiple .choices__item {
+    border-radius: 10px !important;
+    background-color: var(--bs-primary, #0d6efd);
+    border: 1px solid var(--bs-primary, #0d6efd);
+    color: var(--bs-white, #fff);
+    font-size: 0.8em;
+    padding: 0.2em 0.5em;
+    margin: 2px 3px 2px 0; /* Отступы между тегами */
+}
+.choices__list--multiple .choices__item[data-deletable] .choices__button {
+    border-left: 1px solid rgba(255,255,255,0.5) !important;
+    filter: invert(1) grayscale(100%) brightness(200%);
+    margin-left: 0.5em;
+}
+
+.choices__list--dropdown,
+.choices__list[aria-expanded] {
+    border-radius: 12px !important; /* Может быть меньше, например, var(--bs-border-radius-sm, 8px) */
+    border-color: var(--bs-border-color, #dee2e6) !important;
+    background-color: var(--bs-body-bg, #fff);
+    z-index: 1060; /* Выше стандартного z-index модалок Bootstrap (1050-1055) */
+    font-size: 0.875rem;
+}
+
+.choices__list--dropdown .choices__item--selectable {
+    padding: 0.35rem 0.75rem;
+}
+
+.choices__list--dropdown .choices__item--selectable.is-highlighted,
+.choices__list[aria-expanded] .choices__item--selectable.is-highlighted {
+    background-color: var(--bs-primary-bg-subtle, #cfe2ff);
+    border-radius: 8px;
+    color: var(--bs-primary-text-emphasis, #052c65);
+}
+
+/* Убираем лишнюю рамку у оригинального select при фокусе */
+select.form-select[data-choice]:focus,
+select.form-control[data-choice]:focus {
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: 0 !important;
+}
+/* Стили для фокуса на самом Choices.js */
+.choices.is-focused .choices__inner,
+.choices.is-open .choices__inner {
+    border-color: var(--bs-primary, #0d6efd) !important;
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25) !important;
+}
+
+/* ----------------------------------------------------------------- */
+/* 3. Стили для form-floating с Choices.js (используя :has())      */
+/* ----------------------------------------------------------------- */
+.form-floating {
+    position: relative;
+}
+
+/* Label для Choices.js внутри form-floating */
+.form-floating > .choices + label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    padding: 1rem 0.75rem; /* Стандартные отступы Bootstrap для label в form-floating */
+    overflow: hidden;
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    pointer-events: none;
+    border: 1px solid transparent;
+    transform-origin: 0 0;
+    transition: opacity 0.1s ease-in-out, transform 0.1s ease-in-out;
+    color: var(--bs-secondary-color, #6c757d);
+    z-index: 3;
+}
+
+/* Когда Choices.js в фокусе или имеет значение, label "уплывает" наверх */
+.form-floating > .choices.is-focused + label,
+.form-floating > .choices.is-open + label,
+.form-floating > .choices:has(.choices__list--single .choices__item[data-value]:not([data-value=""])) + label,
+.form-floating > .choices:has(.choices__list--multiple .choices__item[data-value]) + label,
+.form-floating > .choices:has(.choices__input[value]:not([value=""])) + label {
+    opacity: 0.65;
+    transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+    background-color: transparent !important; /* Убираем фон у "уплывшего" лейбла */
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    height: auto;
+    width: auto;
+    max-width: calc(100% - 0.3rem);
+}
+
+/* ----------------------------------------------------------------- */
+/* 4. Иконка информации (тултип) для form-floating                 */
+/* ----------------------------------------------------------------- */
+.form-floating-info-icon {
+    position: absolute;
+    top: 0.8rem;  /* Подбирайте это значение. Для стандартного form-floating */
+                  /* (высота ~3.5rem), это примерно центр "уплывшего" лейбла. */
+                  /* Если используете form-control-sm, top может быть меньше, например 0.6rem */
+    right: 0.8rem;
+    cursor: help;
+    z-index: 4;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* padding: 0.2rem; */ /* Можно добавить, если иконка слишком маленькая для клика */
+}
+
+.form-floating-info-icon > i {
+    font-size: 1em; /* Относительно родителя .form-floating-info-icon */
+    vertical-align: middle;
+}
+
+/* Для обычных форм (не form-floating), где иконка внутри label */
+label .ti-info-circle {
+    cursor: help;
+    font-size: 0.9em; /* Немного меньше основного текста лейбла */
+    vertical-align: middle; /* Для лучшего выравнивания с текстом */
+}
+
+
+/* -------------------------------------------------------------- */
+/* 5. Плавность для HTMX (примеры)                               */
+/* -------------------------------------------------------------- */
+.htmx-settling {
+    opacity: 0;
+}
+.htmx-settling.htmx-added {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+
+.htmx-swapping {
+    opacity: 1;
+    transition: opacity 200ms ease-out !important;
+}
+body.htmx-request .htmx-swapping {
+    opacity: 0;
+}
+
+/* -------------------------------------------------------------- */
+/* 6. Ширина колонок таблицы (примеры)                            */
+/* -------------------------------------------------------------- */
+.table th.th-relation,
+.table td.td-relation {
+    min-width: 230px;
+}
+
+.table th.th-actions,
+.table td.td-actions {
+    min-width: 100px;
+    width: 100px;
+    text-align: end;
+}
+
+.table th.th-default,
+.table td.td-default {
+    min-width: 150px;
+}
+
+/* -------------------------------------------------------------- */
+/* 7. Дополнительные стили для консистентности размеров          */
+/*    (если используются .form-control-sm)                      */
+/* -------------------------------------------------------------- */
+/* Если вы хотите, чтобы все поля, включая Choices, были маленькими (как .form-control-sm) */
+/*
+.form-control-sm,
+.form-select-sm,
+.choices__inner { // Применяем стили .form-control-sm к Choices
+    min-height: calc(1.5em + 0.5rem + 2px);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: var(--bs-border-radius-sm, 10px); // Если есть переменная для малого радиуса
+}
+
+.form-floating > .choices > .choices__inner { // Адаптация для form-floating с маленькими полями
+    min-height: calc(1.5em + 0.5rem + 2px); // Та же высота
+    padding-top: 1.375rem;  // Отступ сверху для плавающего лейбла (меньше, т.к. поле ниже)
+    padding-bottom: 0.375rem;
+    line-height: 1.5; // Может быть нужно подстроить
+}
+
+.form-floating > .choices + label { // Лейбл для маленького form-floating
+    padding: 0.75rem 0.5rem; // Адаптируем отступы лейбла
+}
+
+.form-floating > .choices.is-focused + label,
+.form-floating > .choices.is-open + label,
+.form-floating > .choices:has(.choices__list--single .choices__item[data-value]:not([data-value=""])) + label,
+.form-floating > .choices:has(.choices__list--multiple .choices__item[data-value]) + label,
+.form-floating > .choices:has(.choices__input[value]:not([value=""])) + label {
+    transform: scale(0.85) translateY(-0.35rem) translateX(0.15rem); // Сдвиг лейбла для маленького поля
+}
+
+.form-floating-info-icon { // Иконка для маленького form-floating
+    top: 0.6rem;
+    right: 0.6rem;
+}
+*/
+/* custom_styles.css */
+
+/* Убедимся, что .form-floating имеет position: relative */
+.form-floating {
+    position: relative !important; /* Добавляем !important на всякий случай, если тема перебивает */
+}
+
+.form-floating-info-icon {
+    position: absolute;
+    /* top: 0.8rem; */ /* Это значение для стандартного form-control, может быть нужно другое */
+    /* right: 0.8rem; */
+
+    /* Попробуем выровнять относительно ВЕРХА поля и ПРАВОГО края */
+    /* Отступы Bootstrap для form-control: padding: .375rem .75rem; font-size: 1rem; line-height: 1.5; */
+    /* Высота label в form-floating примерно 1rem (padding-top) + немного на сам текст */
+    /* Когда label "уплыл", он становится меньше. */
+
+    /* Попробуем так: выровнять по центру вертикально относительно высоты "уплывшего" лейбла */
+    /* и сдвинуть вправо. */
+    top: 0; /* Начинаем с верха .form-floating */
+    right: 0.75rem; /* Стандартный правый отступ поля */
+    height: 1rem; /* Примерная высота строки для "уплывшего" лейбла */
+
+    /* Вертикальное выравнивание самой иконки внутри этого span */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding-top: 1rem; /* Сдвигаем иконку вниз на высоту "большого" лейбла */
+                      /* Это нужно, чтобы при пустом поле иконка была на уровне текста лейбла */
+                      /* А когда лейбл уплывает, иконка остается на месте */
+
+    /* Когда лейбл уплыл (поле заполнено или в фокусе), иконка должна быть выше */
+    /* Мы можем использовать CSS переменные или отдельные классы, но это сложнее */
+    /* Проще всего спозиционировать ее так, чтобы она всегда была в одном месте */
+    /* относительно верхнего правого угла поля ввода. */
+
+    /* НОВЫЙ ПОДХОД К ПОЗИЦИОНИРОВАНИЮ ИКОНКИ: */
+    /* Позиционируем относительно верхнего правого угла поля ввода, */
+    /* немного сдвигая внутрь. */
+    top: 0.375rem;  /* Примерный верхний отступ стандартного form-control */
+    right: 0.75rem; /* Примерный правый отступ стандартного form-control */
+    /* Если у вас поля .form-control-sm, то top: 0.25rem; right: 0.5rem; */
+
+    transform: translateY(0); /* Убираем предыдущий transform, если был */
+
+    cursor: help;
+    z-index: 4;
+    line-height: 1;
+}
+
+.form-floating-info-icon > i {
+    font-size: 1em; /* Размер иконки относительно span */
+    /* vertical-align: middle; */ /* Уже не нужно, если используем flex */
+}
+
+/* Если label "уплыл", иконка должна оставаться на том же месте */
+/* Это достигается тем, что иконка позиционируется относительно .form-floating, */
+/* а не относительно label. */
+
+/* Для не-form-floating лейблов (например, у свитчей) */
+label .ti-info-circle {
+    cursor: help;
+    font-size: 0.9em;
+    vertical-align: middle;
+}

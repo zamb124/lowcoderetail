@@ -1,28 +1,23 @@
 {# core_sdk/frontend/templates/fields/relation_select.html #}
-{# Ожидает: field_ctx (FieldRenderContext), url_for #}
-<div class="mb-5 fv-row">
-    <label for="{{ field_ctx.html_id }}" class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}">
-        {{ field_ctx.label }}
-    </label>
-    <select class="form-select form-select-solid {% if field_ctx.errors %}is-invalid{% endif %}"
-            {# Атрибуты для Choices.js #}
+{# Ожидает: field_ctx, url_for #}
+<div class="form-floating mb-3">
+    <select class="form-select td-relation a{% if field_ctx.errors %}is-invalid{% endif %}"
             data-control="choicesjs"
-            data-placeholder="{{ field_ctx.extra.get('placeholder', 'Выберите ' ~ field_ctx.label ~ '...') }}"
             data-allow-clear="{{ 'true' if field_ctx.extra.get('allow_clear', True) and not field_ctx.is_required else 'false' }}"
             data-load-options-url="{{ url_for('get_select_options', model_name=field_ctx.extra.relation_model_name) }}"
             data-search-enabled="{{ field_ctx.extra.get('search_enabled', 'true') }}"
-            data-remove-item-button="{{ field_ctx.extra.get('remove_item_button', 'true') }}"
             id="{{ field_ctx.html_id }}"
             name="{{ field_ctx.html_name }}"
-            {# {% if field_ctx.is_readonly %}disabled{% endif %} #} {# Choices.js должен подхватить disabled #}
+            {% if field_ctx.is_readonly %}disabled{% endif %}
             {% if field_ctx.is_required %}required{% endif %}
-            aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors">
+            aria-label="{{ field_ctx.label }}"
+            aria-describedby="{{ field_ctx.html_id }}_errors">
 
-        {# Предзагрузка текущего значения, если оно есть. #}
-        {# Choices.js сможет его использовать при инициализации. #}
+        {% if not field_ctx.value and not field_ctx.is_required %} {# Добавляем пустую опцию для плейсхолдера, если значение не задано и не обязательно #}
+            <option value="">{{ field_ctx.extra.get('placeholder', field_ctx.label ~ '...') }}</option>
+        {% endif %}
+
         {% if field_ctx.value %}
-            {# Если field_ctx.options уже содержит текущее значение (например, из _load_options в SDKField), #}
-            {# то оно будет выбрано. Иначе, добавляем его явно. #}
             {% set current_value_str = field_ctx.value | string %}
             {% set found_in_options = false %}
             {% if field_ctx.options %}
@@ -33,27 +28,25 @@
                     {% endif %}
                 {% endfor %}
             {% endif %}
-
             {% if not found_in_options %}
-                {# Если текущего значения нет в field_ctx.options (которые SDKField._load_options мог загрузить), #}
-                {# добавляем его. TitleResolver на клиенте может позже обновить label, если нужно, #}
-                {# но для Choices.js важно, чтобы <option> существовал для начального значения. #}
-                {# Мы не знаем display_name здесь, поэтому используем ID или "Загрузка..." #}
                 <option value="{{ current_value_str }}" selected>
-                    ID: {{ current_value_str | truncate(8, True, '...') }} (Загрузка названия...)
+                    ID: {{ current_value_str | truncate(12, True, '...') }}
                 </option>
             {% endif %}
-        {% else %}
-             <option value=""></option> {# Пустая опция для placeholder, если значение не выбрано #}
         {% endif %}
     </select>
+    <label for="{{ field_ctx.html_id }}">
+        {{ field_ctx.label }}{% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
+        {% if field_ctx.description %}
+            <i class="ti ti-info-circle ms-1 text-muted" style="cursor: help; font-size: 0.9em;"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="{{ field_ctx.description | escape }}"></i>
+        {% endif %}
 
-    {% if field_ctx.description %}
-        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
-    {% endif %}
+    </label>
 
     {% if field_ctx.errors %}
-        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback mt-1">
+        <div class="invalid-feedback">
             {{ field_ctx.errors | join(', ') }}
         </div>
     {% endif %}

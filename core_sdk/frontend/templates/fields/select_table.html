@@ -1,8 +1,0 @@
-{# Ожидает: field_ctx (FieldRenderContext с options) #}
-{% set display_value = '-' %}
-{% for opt_value, opt_label in field_ctx.options %}
-    {% if opt_value == field_ctx.value %}
-        {% set display_value = opt_label %}
-    {% endif %}
-{% endfor %}
-{{ display_value }}

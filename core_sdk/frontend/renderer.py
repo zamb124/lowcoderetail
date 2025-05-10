@@ -241,9 +241,8 @@ class ViewRenderer:
         await self._prepare_fields()
 
         field_contexts: List[FieldRenderContext] = []
-        if self.mode not in [RenderMode.LIST_ROWS]:
-            for sdk_field in self._fields:
-                field_contexts.append(await sdk_field.get_render_context())
+        for sdk_field in self._fields:
+            field_contexts.append(await sdk_field.get_render_context())
 
         # ... (формирование title, processed_errors, filter_form_id_val и т.д. как было) ...
         title_map = { # ... как было ...

@@ -15,7 +15,7 @@
             {% set filter_form_id = ctx.filter_form_id %} {# Берем из ctx #}
             {% set row_hx_attrs = {
                 "hx-get": base_next_url,
-                "hx-include": "#" ~ filter_form_id if filter_form_id else "none",
+                "hx-include": filter,
                 "hx-vals": hx_vals_dict|tojson,
                 "hx-trigger": "revealed",
                 "hx-swap": "afterend",

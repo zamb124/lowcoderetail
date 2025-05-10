@@ -1,36 +1,34 @@
 {# core_sdk/frontend/templates/components/form.html #}
 {# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
-{# Этот шаблон теперь представляет собой ПОЛНУЮ форму, включая тег <form> и кнопки. #}
-{# Он будет вставлен в .modal-body. #}
+{# Этот шаблон ТЕПЕРЬ СНОВА СОДЕРЖИТ тег <form> и является самодостаточным компонентом формы. #}
+{# Он будет вставлен в .modal-body или на обычную страницу. #}
 
 {% set form_action_url = url_for('update_item', model_name=ctx.model_name, item_id=ctx.item_id) if ctx.mode == 'edit' else url_for('create_item', model_name=ctx.model_name) %}
 {% set form_method = 'put' if ctx.mode == 'edit' else 'post' %}
 
 {# Определяем, загружен ли этот контент в модальное окно Bootstrap #}
-{# Проверяем, был ли hx-target на .modal-body или .modal-content #}
-{% set is_inside_modal_body = request.headers.get("HX-Target") and (".modal-body" in request.headers.get("HX-Target") or ".modal-content" in request.headers.get("HX-Target")) %}
-{# Или если ID самого элемента формы (ctx.html_id) содержит "modal", это тоже признак #}
-{% if not is_inside_modal_body and ctx.html_id and "modal" in ctx.html_id %}
-    {% set is_inside_modal_body = true %}
-{% endif %}
+{% set is_inside_modal_context = request.headers.get("HX-Target") and
+                                 ( ("#modal-placeholder" in request.headers.get("HX-Target")) or
+                                   (".modal-body" in request.headers.get("HX-Target")) or
+                                   (".modal-content" in request.headers.get("HX-Target"))
+                                 )
+                                 or (ctx.html_id and ("modal-form-" in ctx.html_id or "modal-view-" in ctx.html_id )) %}
 
-
-<form id="{{ ctx.html_id }}"
+<form id="{{ ctx.html_id }}" {# Уникальный ID для этой формы #}
       hx-{{ form_method }}="{{ form_action_url }}"
       hx-ext="json-enc"
       {# При ошибке валидации (422), сервер вернет этот же form.html с ошибками. #}
-      {# HTMX заменит содержимое .modal-body (или другого hx-target изначального запроса) #}
-      {# на этот новый HTML формы. #}
-      hx-target="this" {# Форма заменяет саму себя при ответе (успех или ошибка с HTML) #}
-      hx-swap="outerHTML" {# Заменяем весь тег <form> #}
-      {# Если успешный ответ 204, то сработает HX-Trigger: closeModal #}
-      class="form-component-wrapper" {# Добавим класс для возможной стилизации #}
+      {# HTMX заменит этот <form> (из-за hx-swap="outerHTML") новым <form> с ошибками. #}
+      hx-target="this"
+      hx-swap="outerHTML"
+      class="form-component-wrapper" {# Можно убрать, если не используется #}
       ui_key="{{ ctx.model_name }}--{{ ctx.item_id if ctx.item_id else 'new' }}"
       data-lsn="{{ ctx.item.lsn if ctx.item and ctx.item.lsn else '0' }}">
 
-    {# Заголовок формы (если нужен внутри этого компонента) #}
-    {# <h4 class="mb-4">{{ ctx.title }}</h4> #}
-    {# Обычно заголовок уже есть в модалке или на странице. #}
+    {# Заголовок формы, если он нужен (например, если это не в модалке, где заголовок внешний) #}
+    {# {% if not is_inside_modal_context %} #}
+    {# <h3 class="mb-4">{{ ctx.title }}</h3> #}
+    {# {% endif %} #}
 
     {# Отображение общих ошибок формы #}
     {% if ctx.errors and ctx.errors._form %}
@@ -49,7 +47,7 @@
         </div>
     {% endif %}
 
-    {# Отображение полей #}
+    {# Отображение полей (каждое поле теперь form-floating, если применимо) #}
     {% for field_ctx_loopvar in ctx.fields %}
          {% set field_errors = ctx.errors.get(field_ctx_loopvar.name) if ctx.errors and ctx.errors is mapping else None %}
          {% set current_field_ctx = field_ctx_loopvar.model_copy(update={'errors': field_errors}) %}
@@ -59,14 +57,16 @@
     {% endfor %}
 
     {# Футер с кнопками ВНУТРИ формы #}
-    <div class="pt-5 mt-3 border-top"> {# Отступ и линия #}
+    <div class="pt-5 mt-3 border-top">
         <div class="d-flex justify-content-end">
-            {% if is_inside_modal_body %}
+            {% if is_inside_modal_context %}
+                {# Эта кнопка "Отмена" закроет модалку Bootstrap #}
                 <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Отмена</button>
             {% elif ctx.mode == 'edit' %}
+                {# Эта кнопка "Отмена" для немодальной формы редактирования, вернет view #}
                 <button type="button" class="btn btn-light me-3"
                         hx-get="{{ url_for('get_view', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                        hx-target="#{{ ctx.html_id }}" {# Заменяем эту форму на view #}
+                        hx-target="#{{ ctx.html_id }}" {# Заменяем эту форму (this) на view #}
                         hx-swap="outerHTML">
                     Отмена
                 </button>
@@ -76,7 +76,7 @@
                 </a>
             {% endif %}
 
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary"> {# Атрибут form="" больше не нужен #}
                  <span class="indicator-label">Сохранить</span>
                  <span class="indicator-progress d-none">Пожалуйста, подождите...
                      <span class="spinner-border spinner-border-sm align-middle ms-2"></span>

@@ -4,6 +4,7 @@
 <html lang="en">
 <head>
     {# ... head content ... #}
+    <meta name="htmx-config" content='{"globalViewTransitions": true}'>
     <title>{{ title | default("Admin Panel") }} | CorePlatform</title>
     <link rel="icon" href="{{ SDK_STATIC_URL }}/datta-able/assets/images/favicon.svg" type="image/x-icon"/>
     <link href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/opensans.cssp" rel="stylesheet"/>
@@ -14,6 +15,7 @@
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/fonts/phosphor/duotone/style.css"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style.css" id="main-style-link"/>
     <link rel="stylesheet" href="{{ SDK_STATIC_URL }}/datta-able/assets/css/style-preset.css"/>
+    <link rel="stylesheet" href="/static/custom_styles.css"/>
     {% block head_css %}{% endblock %}
     <script src="{{ SDK_STATIC_URL }}/js/htmx.js"></script>
     <script src="{{ SDK_STATIC_URL }}/js/htmx.json-enc.js"></script>

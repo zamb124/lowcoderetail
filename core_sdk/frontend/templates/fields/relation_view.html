@@ -1,24 +1,33 @@
-{# Ожидает: field_ctx (FieldRenderContext), url_for #}
-<div class="mb-3 row">
-    <label class="col-lg-4 col-form-label fw-semibold text-muted">{{ field_ctx.label }}</label>
-    <div class="col-lg-8">
+{# core_sdk/frontend/templates/fields/relation_view.html #}
+{# Ожидает: field_ctx, url_for, request #}
+<div class="form-floating mb-3">
+    <div class="form-control-plaintext ps-3 pe-3 pt-3 pb-1" id="{{ field_ctx.html_id }}-view-val"
+         style="min-height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center;">
         {% if field_ctx.value %}
-            {% set item_id_val = field_ctx.value %}
+            {% set item_id_val = field_ctx.value.id if field_ctx.value is mapping and field_ctx.value.id else field_ctx.value %}
             {% set related_model_name = field_ctx.extra.relation_model_name %}
+            {% set display_text = field_ctx.value.name if field_ctx.value is mapping and field_ctx.value.name else (field_ctx.value.title if field_ctx.value is mapping and field_ctx.value.title else (item_id_val | string | truncate(12, True, '...'))) %}
+            {% set view_content_url = url_for('get_view', model_name=related_model_name, item_id=item_id_val) %}
             <a href="#" class="fw-bold text-primary text-hover-warning needs-title-resolution"
                data-model-name="{{ related_model_name }}"
                data-item-id="{{ item_id_val }}"
-               hx-get="{{ url_for('get_view', model_name=related_model_name, item_id=item_id_val) }}"
-               hx-target="#modal-placeholder" {# Открываем в модалке #}
+               hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-xxl"
+               hx-target="#modal-placeholder"
                hx-swap="innerHTML"
                title="Просмотр {{ related_model_name }} {{ item_id_val }}">
-                {{- item_id_val|string|truncate(8, True, '...') -}}
+                {{- display_text if display_text != item_id_val|string|truncate(12, True, '...') else item_id_val|string|truncate(12, True, '...') -}}
+                {% if display_text == item_id_val|string|truncate(12, True, '...') and item_id_val %}(Загрузка...){% endif %}
             </a>
         {% else %}
-            <span class="text-muted">Не указано</span>
+            <span class="text-muted"> </span> {# Для корректной работы floating label #}
         {% endif %}
-         {% if field_ctx.description %}
-            <p class="text-muted fs-7 mt-1">{{ field_ctx.description }}</p>
-         {% endif %}
+
     </div>
+    <label for="{{ field_ctx.html_id }}-view-val" class="text-muted">{{ field_ctx.label }}
+    {% if field_ctx.description %}
+            <i class="ti ti-info-circle ms-1 text-muted" style="cursor: help; font-size: 0.9em;"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="{{ field_ctx.description | escape }}"></i>
+        {% endif %}</label>
+
 </div>

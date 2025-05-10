@@ -10,7 +10,7 @@
 <td id="{{ cell_id }}"
     {% if not is_self_updating_field and field_ctx.extra.get('editable', True) and not field_ctx.is_readonly %}
     hx-get="{{ url_for('get_inline_edit_field', model_name=model_name, item_id=item.id, field_name=field_ctx.name) }}"
-    hx-trigger="click"
+    hx-trigger=click[!this.querySelector('.inline-edit-wrapper')]"
     hx-target="#{{ cell_id }}"
     hx-swap="innerHTML"
     class="editable-cell"

@@ -1,29 +1,32 @@
-{# Ожидает: field_ctx (FieldRenderContext с options) #}
-<div class="mb-5 fv-row">
-    <label for="{{ field_ctx.html_id }}" class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}">
-        {{ field_ctx.label }}
-    </label>
-    <select class="form-select form-select-solid {% if field_ctx.errors %}is-invalid{% endif %}"
-            data-control="select2" {# Атрибут для инициализации Select2 JS #}
-            data-placeholder="Выберите..."
-            data-hide-search="{{ 'true' if (field_ctx.options | length) < 10 else 'false' }}" {# Скрывать поиск для коротких списков #}
+{# core_sdk/frontend/templates/fields/select.html #}
+{# Ожидает: field_ctx #}
+<div class="form-floating mb-3">
+    <select class="form-select {% if field_ctx.errors %}is-invalid{% endif %}"
             id="{{ field_ctx.html_id }}"
             name="{{ field_ctx.html_name }}"
+            data-control="select2-simple" {# Пример для простого Select2, если нужен #}
+            data-placeholder="true"
+            data-hide-search="{{ 'true' if (field_ctx.options | length) < 10 else 'false' }}"
             {% if field_ctx.is_readonly %}disabled{% endif %}
             {% if field_ctx.is_required %}required{% endif %}
-            aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors">
-        <option></option> {# Пустая опция для placeholder #}
-        {% for value, label in field_ctx.options %}
-            <option value="{{ value }}" {% if value == field_ctx.value %}selected{% endif %}>{{ label }}</option>
+            aria-label="{{ field_ctx.label }}"
+            aria-describedby="{{ field_ctx.html_id }}_errors">
+        <option value="">{{ field_ctx.label }}...</option>
+        {% for opt_val, opt_label_text in field_ctx.options %}
+            <option value="{{ opt_val }}" {% if opt_val | string == field_ctx.value | string %}selected{% endif %}>{{ opt_label_text }}</option>
         {% endfor %}
     </select>
-
-    {% if field_ctx.description %}
-        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
-    {% endif %}
+    <label for="{{ field_ctx.html_id }}">
+        {{ field_ctx.label }}{% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
+        {% if field_ctx.description %}
+            <i class="ti ti-info-circle ms-1 text-muted" style="cursor: help; font-size: 0.9em;"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="{{ field_ctx.description | escape }}"></i>
+        {% endif %}
+    </label>
 
     {% if field_ctx.errors %}
-        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback mt-1">
+        <div class="invalid-feedback">
             {{ field_ctx.errors | join(', ') }}
         </div>
     {% endif %}

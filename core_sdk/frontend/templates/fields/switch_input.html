@@ -1,33 +1,33 @@
 {# core_sdk/frontend/templates/fields/switch_input.html #}
-{# Ожидает: field_ctx (FieldRenderContext) #}
-<div class="mb-5 fv-row">
-    <label class="form-label fs-6 fw-semibold {% if field_ctx.is_required %}required{% endif %}" for="{{ field_ctx.html_id }}">
-        {{ field_ctx.label }}
-    </label>
-    <div class="form-check form-switch form-check-custom form-check-solid">
-        <input class="form-check-input input-primary" type="checkbox"
+{# Ожидает: field_ctx #}
+<div class="ms-1 fv-row">
+    <div class="form-check form-switch form-check-custom form-check-solid d-flex align-items-center pt-2 pb-2">
+        <input class="form-check-input input-primary me-2" type="checkbox"
                role="switch"
                id="{{ field_ctx.html_id }}"
-               name="{{ field_ctx.html_name }}" {# Имя для отправки формы #}
-               {# Для json-enc и форм, если hx-ext="json-enc" на форме, #}
-               {# модифицированный json-enc.js сам отправит true/false. #}
-               {# Если используется hx-vals на инпуте, то value здесь не так важен. #}
-               {# Оставим value="true" для совместимости, если json-enc не модифицирован глобально. #}
+               name="{{ field_ctx.html_name }}"
                value="true"
                {% if field_ctx.value == True %}checked{% endif %}
                {% if field_ctx.is_readonly %}disabled{% endif %}
-               aria-describedby="{{ field_ctx.html_id }}_help {{ field_ctx.html_id }}_errors"
-               />
-        <label class="form-check-label" for="{{ field_ctx.html_id }}">
-            {# Можно добавить текст типа "Вкл/Выкл" или оставить пустым, если название поля говорит само за себя #}
-            {# {{ 'Включено' if field_ctx.value == True else 'Выключено' }} #}
+               aria-describedby="{{ field_ctx.html_id }}_errors"
+        />
+        <label class="form-check-label fw-semibold" for="{{ field_ctx.html_id }}">
+            {{ field_ctx.label }}
+            {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
+            <label for="{{ field_ctx.html_id }}">
+                {% if field_ctx.description %}
+                    <i class="ti ti-info-circle ms-1 text-muted"
+                       style="cursor: help; font-size: 0.9em;"
+                       data-bs-toggle="tooltip"
+                       data-bs-placement="top"
+                       data-bs-container="#{{ modal_id_для_этой_формы }}" {# <--- ВАЖНО #}
+                       title="{{ field_ctx.description | escape }}"></i>
+                {% endif %}
+            </label>
         </label>
     </div>
-    {% if field_ctx.description %}
-        <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">{{ field_ctx.description }}</div>
-    {% endif %}
     {% if field_ctx.errors %}
-        <div id="{{ field_ctx.html_id }}_errors" class="invalid-feedback d-block mt-1">
+        <div class="invalid-feedback d-block mt-1">
             {{ field_ctx.errors | join(', ') }}
         </div>
     {% endif %}
