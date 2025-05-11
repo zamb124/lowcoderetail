@@ -6,6 +6,7 @@ from ..schemas.purchase_order_schema import PurchaseOrderCreate, PurchaseOrderUp
 
 logger = logging.getLogger("app.data_access.purchase_order_manager")
 
+
 class PurchaseOrderManager(BaseDataAccessManager[PurchaseOrder, PurchaseOrderCreate, PurchaseOrderUpdate]):
     model = PurchaseOrder
     create_schema = PurchaseOrderCreate
@@ -22,5 +23,6 @@ class PurchaseOrderManager(BaseDataAccessManager[PurchaseOrder, PurchaseOrderCre
     #     db_item = await super()._prepare_for_create(validated_data)
     #     return db_item
     pass
+
 
 logger.debug("PurchaseOrderManager defined.")

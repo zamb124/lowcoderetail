@@ -7,6 +7,7 @@ from starlette.websockets import WebSocketState
 
 logger = logging.getLogger("app.ws_manager")
 
+
 class ConnectionManager:
     def __init__(self):
         # Храним активные соединения: {user_id: {websocket1, websocket2}}
@@ -18,8 +19,10 @@ class ConnectionManager:
         if user_id not in self.active_connections:
             self.active_connections[user_id] = set()
         self.active_connections[user_id].add(websocket)
-        logger.info(f"User '{user_id}' connected via WebSocket ({websocket.client.host}:{websocket.client.port}). "
-                    f"Total connections for user: {len(self.active_connections[user_id])}")
+        logger.info(
+            f"User '{user_id}' connected via WebSocket ({websocket.client.host}:{websocket.client.port}). "
+            f"Total connections for user: {len(self.active_connections[user_id])}"
+        )
 
     def disconnect(self, websocket: WebSocket, user_id: str):
         """Удаляет соединение из пула."""
@@ -27,14 +30,22 @@ class ConnectionManager:
             connections = self.active_connections[user_id]
             if websocket in connections:
                 connections.remove(websocket)
-                logger.info(f"User '{user_id}' disconnected WebSocket ({websocket.client.host}:{websocket.client.port}).")
+                logger.info(
+                    f"User '{user_id}' disconnected WebSocket ({websocket.client.host}:{websocket.client.port})."
+                )
                 if not connections:
                     del self.active_connections[user_id]
-                    logger.info(f"User '{user_id}' has no more active WebSocket connections.")
+                    logger.info(
+                        f"User '{user_id}' has no more active WebSocket connections."
+                    )
             else:
-                logger.warning(f"Attempted to disconnect an unknown websocket for user '{user_id}'.")
+                logger.warning(
+                    f"Attempted to disconnect an unknown websocket for user '{user_id}'."
+                )
         else:
-             logger.warning(f"Attempted to disconnect websocket for non-connected user '{user_id}'.")
+            logger.warning(
+                f"Attempted to disconnect websocket for non-connected user '{user_id}'."
+            )
 
     async def _send_json(self, websocket: WebSocket, data: dict):
         """Безопасная отправка JSON сообщения."""
@@ -43,20 +54,30 @@ class ConnectionManager:
                 await websocket.send_json(data)
                 return True
             except Exception as e:
-                logger.warning(f"Failed to send WebSocket message to {websocket.client}: {e}")
+                logger.warning(
+                    f"Failed to send WebSocket message to {websocket.client}: {e}"
+                )
                 return False
         else:
-            logger.warning(f"WebSocket {websocket.client} is not connected, cannot send message.")
+            logger.warning(
+                f"WebSocket {websocket.client} is not connected, cannot send message."
+            )
             return False
 
-    async def send_to_user(self, user_id: str, event: str, payload: Optional[dict] = None):
+    async def send_to_user(
+        self, user_id: str, event: str, payload: Optional[dict] = None
+    ):
         """Отправляет сообщение конкретному пользователю (всем его соединениям)."""
         message = {"event": event, "payload": payload or {}}
         disconnected_sockets = set()
 
         if user_id in self.active_connections:
-            connections = list(self.active_connections[user_id]) # Копируем для итерации
-            logger.debug(f"Sending event '{event}' to user '{user_id}' ({len(connections)} connections). Payload: {payload}")
+            connections = list(
+                self.active_connections[user_id]
+            )  # Копируем для итерации
+            logger.debug(
+                f"Sending event '{event}' to user '{user_id}' ({len(connections)} connections). Payload: {payload}"
+            )
             for connection in connections:
                 if not await self._send_json(connection, message):
                     disconnected_sockets.add(connection)
@@ -66,7 +87,9 @@ class ConnectionManager:
                 for socket in disconnected_sockets:
                     self.disconnect(socket, user_id)
         else:
-            logger.debug(f"No active WebSocket connections found for user '{user_id}' to send event '{event}'.")
+            logger.debug(
+                f"No active WebSocket connections found for user '{user_id}' to send event '{event}'."
+            )
 
     async def broadcast(self, event: str, payload: Optional[dict] = None):
         """Отправляет сообщение всем подключенным пользователям."""
@@ -76,11 +99,13 @@ class ConnectionManager:
 
         # Собираем все сокеты и ID пользователей для очистки
         for user_id, connections in self.active_connections.items():
-            all_sockets.extend(list(connections)) # Копируем
-            if not connections: # На всякий случай, если остались пустые записи
-                 user_ids_to_clean.append(user_id)
+            all_sockets.extend(list(connections))  # Копируем
+            if not connections:  # На всякий случай, если остались пустые записи
+                user_ids_to_clean.append(user_id)
 
-        logger.info(f"Broadcasting event '{event}' to {len(all_sockets)} connections. Payload: {payload}")
+        logger.info(
+            f"Broadcasting event '{event}' to {len(all_sockets)} connections. Payload: {payload}"
+        )
 
         disconnected_sockets_map: Dict[str, Set[WebSocket]] = {}
 
@@ -99,8 +124,9 @@ class ConnectionManager:
                         disconnected_sockets_map[socket_user_id] = set()
                     disconnected_sockets_map[socket_user_id].add(socket)
                 else:
-                     logger.warning("Could not find user_id for a disconnected socket during broadcast.")
-
+                    logger.warning(
+                        "Could not find user_id for a disconnected socket during broadcast."
+                    )
 
         # Очищаем отключенные сокеты
         for user_id, sockets in disconnected_sockets_map.items():
@@ -109,8 +135,11 @@ class ConnectionManager:
 
         # Удаляем пустые записи пользователей
         for user_id in user_ids_to_clean:
-            if user_id in self.active_connections and not self.active_connections[user_id]:
-                 del self.active_connections[user_id]
+            if (
+                user_id in self.active_connections
+                and not self.active_connections[user_id]
+            ):
+                del self.active_connections[user_id]
 
 
 # Глобальный экземпляр менеджера

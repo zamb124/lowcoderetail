@@ -3,28 +3,40 @@ import logging
 from typing import Optional, List, Any, Dict, Union
 from uuid import UUID
 
-from fastapi import HTTPException, status # Добавляем status для кодов ошибок
+from fastapi import HTTPException, status  # Добавляем status для кодов ошибок
 
 # Импортируем базовый менеджер и нужные типы из SDK
-from core_sdk.data_access.base_manager import BaseDataAccessManager, CreateSchemaType, ModelType
-from core_sdk.exceptions import CoreSDKError # Для обработки ошибок базового менеджера
+from core_sdk.data_access.base_manager import (
+    BaseDataAccessManager,
+    CreateSchemaType,
+    ModelType,
+)
+from core_sdk.exceptions import CoreSDKError  # Для обработки ошибок базового менеджера
 
 # Локальные импорты приложения
-from .. import models # Нужны модели для type hinting и операций
-from .. import schemas # Нужны схемы для type hinting
-from ..schemas.company import CompanyRead # Конкретная схема для возвращаемого типа
+from .. import models  # Нужны модели для type hinting и операций
+from .. import schemas  # Нужны схемы для type hinting
+from ..schemas.company import CompanyRead  # Конкретная схема для возвращаемого типа
 
 # AsyncSession не используется напрямую
 # settings не используется напрямую
 
-logger = logging.getLogger(__name__) # Имя будет app.data_access.company_manager
+logger = logging.getLogger(__name__)  # Имя будет app.data_access.company_manager
 
-class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, schemas.company.CompanyCreate, schemas.company.CompanyUpdate]):
+
+class CompanyDataAccessManager(
+    BaseDataAccessManager[
+        models.company.Company,
+        schemas.company.CompanyCreate,
+        schemas.company.CompanyUpdate,
+    ]
+):
     """
     Менеджер доступа к данным (DAM) для модели Company.
     Предоставляет CRUD операции и специфичные для компании методы.
     Наследует базовую CRUD логику от BaseDataAccessManager.
     """
+
     # Явно определяем модель и схемы для ясности и проверки типов
     model = models.company.Company
     create_schema = schemas.company.CompanyCreate
@@ -71,7 +83,9 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
             # Не пробрасываем ошибку дальше, возвращаем None или можно выбросить специфичное исключение
             return None
 
-    async def get_company_users(self, company_id: UUID, limit: int = 50, cursor: Optional[int] = None) -> List[models.user.User]:
+    async def get_company_users(
+        self, company_id: UUID, limit: int = 50, cursor: Optional[int] = None
+    ) -> List[models.user.User]:
         """
         Извлекает список пользователей, принадлежащих указанной компании.
         ВНИМАНИЕ: Текущая реализация не завершена и требует доработки.
@@ -82,11 +96,15 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
         :return: Список объектов User.
         :raises NotImplementedError: Указывает, что метод требует дальнейшей реализации.
         """
-        logger.info(f"Company DAM: Getting users for company {company_id} (Limit: {limit}, Cursor: {cursor}).")
+        logger.info(
+            f"Company DAM: Getting users for company {company_id} (Limit: {limit}, Cursor: {cursor})."
+        )
         company = await self.get(company_id)
         if not company:
-            logger.warning(f"Company {company_id} not found when trying to get its users.")
-            return [] # Возвращаем пустой список, если компания не найдена
+            logger.warning(
+                f"Company {company_id} not found when trying to get its users."
+            )
+            return []  # Возвращаем пустой список, если компания не найдена
 
         # TODO: Реализовать логику получения пользователей.
         # Варианты:
@@ -97,7 +115,9 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
         # 3. Использование связи `company.users` (если она правильно настроена и загружена).
         #    Пример: `await self.session.refresh(company, attribute_names=['users']); return company.users` (требует осторожности с производительностью).
         logger.error("get_company_users method is not implemented.")
-        raise NotImplementedError("Accessing users from Company DAM requires further implementation (direct query or User DAM dependency)")
+        raise NotImplementedError(
+            "Accessing users from Company DAM requires further implementation (direct query or User DAM dependency)"
+        )
 
     async def activate_company(self, company_id: UUID) -> CompanyRead:
         """
@@ -113,11 +133,16 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
         company = await self.get(company_id)
         if not company:
             logger.warning(f"Company {company_id} not found for activation.")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Company {company_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Company {company_id} not found",
+            )
 
         if company.is_active:
-            logger.info(f"Company DAM: Company {company_id} is already active. No action needed.")
-            return CompanyRead.model_validate(company) # Возвращаем текущие данные
+            logger.info(
+                f"Company DAM: Company {company_id} is already active. No action needed."
+            )
+            return CompanyRead.model_validate(company)  # Возвращаем текущие данные
 
         logger.debug(f"Company {company_id} is inactive, attempting to activate.")
         try:
@@ -126,15 +151,27 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
             logger.info(f"Company {company_id} activated successfully.")
             # Преобразуем результат (модель SQLAlchemy/SQLModel) в схему Pydantic для возврата
             return CompanyRead.model_validate(updated_company_model)
-        except HTTPException as e: # Пробрасываем HTTP ошибки из self.update (например, 404 если гонка состояний)
-            logger.error(f"Company DAM: HTTP error during activation of company {company_id}: Status={e.status_code}, Detail={e.detail}")
+        except HTTPException as e:  # Пробрасываем HTTP ошибки из self.update (например, 404 если гонка состояний)
+            logger.error(
+                f"Company DAM: HTTP error during activation of company {company_id}: Status={e.status_code}, Detail={e.detail}"
+            )
             raise e
-        except CoreSDKError as e: # Ловим ошибки базового менеджера
-            logger.exception(f"Company DAM: CoreSDKError activating company {company_id}.")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to activate company due to SDK error: {e}")
+        except CoreSDKError as e:  # Ловим ошибки базового менеджера
+            logger.exception(
+                f"Company DAM: CoreSDKError activating company {company_id}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to activate company due to SDK error: {e}",
+            )
         except Exception as e:
-            logger.exception(f"Company DAM: Unexpected error activating company {company_id}.")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to activate company: {e}")
+            logger.exception(
+                f"Company DAM: Unexpected error activating company {company_id}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to activate company: {e}",
+            )
 
     async def deactivate_company(self, company_id: UUID) -> models.company.Company:
         """
@@ -152,15 +189,26 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
             logger.info(f"Company {company_id} deactivated successfully.")
             return updated_company
         except HTTPException as e:
-            logger.error(f"Company DAM: HTTP error during deactivation of company {company_id}: Status={e.status_code}, Detail={e.detail}")
+            logger.error(
+                f"Company DAM: HTTP error during deactivation of company {company_id}: Status={e.status_code}, Detail={e.detail}"
+            )
             raise e
         except CoreSDKError as e:
-            logger.exception(f"Company DAM: CoreSDKError deactivating company {company_id}.")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to deactivate company due to SDK error: {e}")
+            logger.exception(
+                f"Company DAM: CoreSDKError deactivating company {company_id}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to deactivate company due to SDK error: {e}",
+            )
         except Exception as e:
-            logger.exception(f"Company DAM: Unexpected error deactivating company {company_id}.")
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to deactivate company: {e}")
-
+            logger.exception(
+                f"Company DAM: Unexpected error deactivating company {company_id}."
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to deactivate company: {e}",
+            )
 
     async def create(self, data: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:
         """
@@ -177,24 +225,42 @@ class CompanyDataAccessManager(BaseDataAccessManager[models.company.Company, sch
 
         # Устанавливаем company_id = id после успешного создания и получения ID
         if new_company.id and new_company.company_id != new_company.id:
-            logger.debug(f"Setting company_id={new_company.id} for newly created company {new_company.id}.")
+            logger.debug(
+                f"Setting company_id={new_company.id} for newly created company {new_company.id}."
+            )
             new_company.company_id = new_company.id
-            self.session.add(new_company) # Добавляем в сессию для сохранения изменения company_id
+            self.session.add(
+                new_company
+            )  # Добавляем в сессию для сохранения изменения company_id
             try:
                 await self.session.commit()
-                await self.session.refresh(new_company) # Обновляем объект из БД
-                logger.info(f"Successfully created company '{new_company.name}' with ID {new_company.id} and set company_id.")
+                await self.session.refresh(new_company)  # Обновляем объект из БД
+                logger.info(
+                    f"Successfully created company '{new_company.name}' with ID {new_company.id} and set company_id."
+                )
             except Exception as e:
                 # Откат произойдет в managed_session
-                logger.exception(f"Company DAM: Error committing company_id update for new company {new_company.id}.")
+                logger.exception(
+                    f"Company DAM: Error committing company_id update for new company {new_company.id}."
+                )
                 # Можно либо вернуть компанию без обновленного company_id, либо выбросить ошибку
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to finalize company creation.")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to finalize company creation.",
+                )
         elif not new_company.id:
-            logger.error("Company DAM: Company created via super().create() but has no ID. This should not happen.")
+            logger.error(
+                "Company DAM: Company created via super().create() but has no ID. This should not happen."
+            )
             # Это неожиданная ситуация, выбрасываем ошибку
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to get ID for newly created company.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to get ID for newly created company.",
+            )
         else:
             # company_id уже был равен id (маловероятно при создании) или не изменился
-            logger.debug(f"Company ID {new_company.id} already has matching company_id.")
+            logger.debug(
+                f"Company ID {new_company.id} already has matching company_id."
+            )
 
         return new_company

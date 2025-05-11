@@ -8,13 +8,18 @@ from core_sdk.app_setup import create_app_with_sdk_setup
 # Локальные импорты Core
 from .config import settings
 from . import registry_config
+
 # --- ИМПОРТИРУЕМ СХЕМЫ ДЛЯ REBUILD ---
 from . import schemas as app_schemas
 # ------------------------------------
 
 # Импорты роутеров API
 from .api.endpoints import (
-    auth, users, companies, groups, i18n,
+    auth,
+    users,
+    companies,
+    groups,
+    i18n,
 )
 
 # Настройка логгера
@@ -41,11 +46,23 @@ schemas_requiring_rebuild = [
 ]
 # ------------------------------------
 
+
 # Хуки жизненного цикла (без изменений)
-async def core_before_startup(): logger.info("Running Core specific actions BEFORE SDK startup...")
-async def core_after_startup(): logger.info("Running Core specific actions AFTER SDK startup...")
-async def core_before_shutdown(): logger.info("Running Core specific actions BEFORE SDK shutdown...")
-async def core_after_shutdown(): logger.info("Running Core specific actions AFTER SDK shutdown...")
+async def core_before_startup():
+    logger.info("Running Core specific actions BEFORE SDK startup...")
+
+
+async def core_after_startup():
+    logger.info("Running Core specific actions AFTER SDK startup...")
+
+
+async def core_before_shutdown():
+    logger.info("Running Core specific actions BEFORE SDK shutdown...")
+
+
+async def core_after_shutdown():
+    logger.info("Running Core specific actions AFTER SDK shutdown...")
+
 
 # Создаем приложение с помощью фабрики SDK
 app = create_app_with_sdk_setup(
@@ -56,7 +73,7 @@ app = create_app_with_sdk_setup(
     manage_http_client=True,
     schemas_to_rebuild=schemas_requiring_rebuild,
     # --- Управляем AuthMiddleware ---
-    enable_auth_middleware=True, # Включаем AuthMiddleware
+    enable_auth_middleware=True,  # Включаем AuthMiddleware
     auth_allowed_paths=[
         f"{settings.API_V1_STR}/docs",
         f"{settings.API_V1_STR}/redoc",
@@ -73,7 +90,7 @@ app = create_app_with_sdk_setup(
     title=settings.PROJECT_NAME,
     description="Core service for the platform.",
     version="0.1.0",
-    include_health_check=True
+    include_health_check=True,
 )
 
 logger.info("--- Core Service Application Setup Complete ---")
@@ -81,17 +98,20 @@ logger.info("--- Core Service Application Setup Complete ---")
 # Точка входа для Uvicorn (без изменений)
 if __name__ == "__main__":
     import uvicorn
+
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     log_level = settings.LOGGING_LEVEL.lower()
     workers = int(os.getenv("WEB_CONCURRENCY", "1"))
 
-    logger.info(f"Starting Uvicorn development server on {host}:{port} with {workers} worker(s)...")
+    logger.info(
+        f"Starting Uvicorn development server on {host}:{port} with {workers} worker(s)..."
+    )
     uvicorn.run(
         "apps.core.main:app",
         host=host,
         port=port,
         log_level=log_level,
         reload=True,
-        workers=workers
+        workers=workers,
     )

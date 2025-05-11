@@ -5,7 +5,7 @@ from typing import Optional, List
 
 from core_sdk.data_access import DataAccessManagerFactory, RemoteDataAccessManager
 from purchase.app.schemas.company_schema import CompanyReadPurchase, CompanyCreatePurchase, CompanyUpdatePurchase
-from purchase.app.config import settings as purchase_settings # Настройки purchase
+from purchase.app.config import settings as purchase_settings  # Настройки purchase
 
 pytestmark = pytest.mark.asyncio
 
@@ -13,17 +13,20 @@ pytestmark = pytest.mark.asyncio
 if not purchase_settings.CORE_SERVICE_URL:
     pytest.skip("CORE_SERVICE_URL not configured, skipping remote Company DAM tests", allow_module_level=True)
 
+
 async def get_company_manager(dam_factory: DataAccessManagerFactory) -> RemoteDataAccessManager:
     """Вспомогательная функция для получения и проверки типа менеджера."""
-    manager = dam_factory.get_manager("CoreCompany") # Используем имя, указанное при регистрации
-    assert isinstance(manager, RemoteDataAccessManager), \
+    manager = dam_factory.get_manager("CoreCompany")  # Используем имя, указанное при регистрации
+    assert isinstance(manager, RemoteDataAccessManager), (
         f"Expected RemoteDataAccessManager for 'CoreCompany', got {type(manager)}"
+    )
     return manager
 
-@pytest.mark.integration_remote # Помечаем как интеграционный тест с удаленным сервисом
+
+@pytest.mark.integration_remote  # Помечаем как интеграционный тест с удаленным сервисом
 async def test_remote_create_and_delete_company(
-        dam_factory_purchase_test: DataAccessManagerFactory,
-        core_superuser_token: Optional[str] # Токен для аутентификации в Core
+    dam_factory_purchase_test: DataAccessManagerFactory,
+    core_superuser_token: Optional[str],  # Токен для аутентификации в Core
 ):
     """Тест создания и удаления компании через удаленный DAM."""
     if not core_superuser_token:
@@ -61,10 +64,10 @@ async def test_remote_create_and_delete_company(
             assert fetched_after_delete is None, "Company still exists after remote delete"
             print(f"Company {created_company.id} confirmed deleted.")
 
+
 @pytest.mark.integration_remote
 async def test_remote_list_companies_with_filters(
-        dam_factory_purchase_test: DataAccessManagerFactory,
-        core_superuser_token: Optional[str]
+    dam_factory_purchase_test: DataAccessManagerFactory, core_superuser_token: Optional[str]
 ):
     """Тест получения списка компаний с фильтрацией через удаленный DAM."""
     if not core_superuser_token:
@@ -99,7 +102,9 @@ async def test_remote_list_companies_with_filters(
         # API Core сервиса должен поддерживать query-параметр `name__like`
         list_params_name_like = {"name__like": unique_prefix, "limit": 5}
         companies_liked: List[CompanyReadPurchase] = await manager.list(filters=list_params_name_like)
-        assert len(companies_liked) == 3, f"Expected 3 companies with prefix '{unique_prefix}', got {len(companies_liked)}"
+        assert len(companies_liked) == 3, (
+            f"Expected 3 companies with prefix '{unique_prefix}', got {len(companies_liked)}"
+        )
         liked_names = {c.name for c in companies_liked}
         assert name1 in liked_names
         assert name2 in liked_names
@@ -140,8 +145,7 @@ async def test_remote_list_companies_with_filters(
 
 @pytest.mark.integration_remote
 async def test_remote_update_company(
-        dam_factory_purchase_test: DataAccessManagerFactory,
-        core_superuser_token: Optional[str]
+    dam_factory_purchase_test: DataAccessManagerFactory, core_superuser_token: Optional[str]
 ):
     """Тест обновления компании через удаленный DAM."""
     if not core_superuser_token:
@@ -163,10 +167,12 @@ async def test_remote_update_company(
         updated_company: Optional[CompanyReadPurchase] = await manager.update(created_company.id, update_payload)
         assert updated_company is not None, "Remote company update returned None"
         assert updated_company.id == created_company.id
-        assert updated_company.name == company_name # Имя не меняли
+        assert updated_company.name == company_name  # Имя не меняли
         assert updated_company.description == updated_description
         assert updated_company.is_active is False
-        print(f"Remotely updated company: ID {updated_company.id}, Desc '{updated_company.description}', Active: {updated_company.is_active}")
+        print(
+            f"Remotely updated company: ID {updated_company.id}, Desc '{updated_company.description}', Active: {updated_company.is_active}"
+        )
 
     finally:
         if created_company and created_company.id:

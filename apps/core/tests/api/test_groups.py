@@ -9,7 +9,9 @@ from starlette.exceptions import HTTPException
 
 from apps.core import schemas, models
 from apps.core.config import settings
-from core_sdk.data_access import DataAccessManagerFactory # Для создания данных в тестах
+from core_sdk.data_access import (
+    DataAccessManagerFactory,
+)  # Для создания данных в тестах
 from core_sdk.db.session import managed_session
 
 pytestmark = pytest.mark.asyncio
@@ -17,11 +19,11 @@ pytestmark = pytest.mark.asyncio
 API_PREFIX = settings.API_V1_STR
 GROUPS_ENDPOINT = f"{API_PREFIX}/groups"
 
+
 # --- Фикстура для создания тестовой группы ---
 @pytest_asyncio.fixture(scope="function")
 async def test_group(
-    dam_factory_test: DataAccessManagerFactory,
-    test_company: models.company.Company
+    dam_factory_test: DataAccessManagerFactory, test_company: models.company.Company
 ) -> models.group.Group:
     """Создает тестовую группу через DAM."""
     group_name = f"Test Group {uuid4()}"
@@ -29,10 +31,9 @@ async def test_group(
     group_data = {
         "name": group_name,
         "description": "A group for testing",
-        "company_id": test_company.id
+        "company_id": test_company.id,
     }
     async with managed_session():
-
         group_manager = dam_factory_test.get_manager("Group")
         try:
             db_group = await group_manager.create(group_data)
@@ -47,6 +48,7 @@ async def test_group(
 
 # --- Тесты для Groups ---
 
+
 async def test_create_group_success(
     async_client: AsyncClient,
     superuser_token_headers: dict,
@@ -57,12 +59,10 @@ async def test_create_group_success(
     data = {
         "name": group_name,
         "description": "Group created via API test",
-        "company_id": str(test_company.id) # Передаем ID компании
+        "company_id": str(test_company.id),  # Передаем ID компании
     }
     response = await async_client.post(
-        GROUPS_ENDPOINT,
-        headers=superuser_token_headers,
-        json=data
+        GROUPS_ENDPOINT, headers=superuser_token_headers, json=data
     )
     assert response.status_code == 201, response.text
     content = response.json()
@@ -70,70 +70,70 @@ async def test_create_group_success(
     assert content["company_id"] == str(test_company.id)
     assert "id" in content
 
+
 async def test_get_group_success(
     async_client: AsyncClient,
     superuser_token_headers: dict,
-    test_group: models.group.Group
+    test_group: models.group.Group,
 ):
     """Тест успешного получения группы по ID."""
     response = await async_client.get(
-        f"{GROUPS_ENDPOINT}/{test_group.id}",
-        headers=superuser_token_headers
+        f"{GROUPS_ENDPOINT}/{test_group.id}", headers=superuser_token_headers
     )
     assert response.status_code == 200, response.text
     content = response.json()
     assert content["id"] == str(test_group.id)
     assert content["name"] == test_group.name
 
+
 async def test_list_groups_success(
     async_client: AsyncClient,
     superuser_token_headers: dict,
-    test_group: models.group.Group
+    test_group: models.group.Group,
 ):
     """Тест получения списка групп."""
     response = await async_client.get(GROUPS_ENDPOINT, headers=superuser_token_headers)
     assert response.status_code == 200, response.text
     content = response.json()
-    assert isinstance(content['items'], list)
-    assert any(g["id"] == str(test_group.id) for g in content['items'])
+    assert isinstance(content["items"], list)
+    assert any(g["id"] == str(test_group.id) for g in content["items"])
+
 
 async def test_update_group_success(
     async_client: AsyncClient,
     superuser_token_headers: dict,
-    test_group: models.group.Group
+    test_group: models.group.Group,
 ):
     """Тест успешного обновления группы."""
     new_desc = "Updated group description"
     data = {"description": new_desc}
     response = await async_client.put(
-        f"{GROUPS_ENDPOINT}/{test_group.id}",
-        headers=superuser_token_headers,
-        json=data
+        f"{GROUPS_ENDPOINT}/{test_group.id}", headers=superuser_token_headers, json=data
     )
     assert response.status_code == 200, response.text
     content = response.json()
     assert content["id"] == str(test_group.id)
     assert content["description"] == new_desc
 
+
 async def test_delete_group_success(
     async_client: AsyncClient,
     superuser_token_headers: dict,
-    test_group: models.group.Group
+    test_group: models.group.Group,
 ):
     """Тест успешного удаления группы."""
     group_id = test_group.id
     response = await async_client.delete(
-        f"{GROUPS_ENDPOINT}/{group_id}",
-        headers=superuser_token_headers
+        f"{GROUPS_ENDPOINT}/{group_id}", headers=superuser_token_headers
     )
     assert response.status_code == 204
 
     # Проверяем удаление
     response_get = await async_client.get(
-        f"{GROUPS_ENDPOINT}/{group_id}",
-        headers=superuser_token_headers
+        f"{GROUPS_ENDPOINT}/{group_id}", headers=superuser_token_headers
     )
     assert response_get.status_code == 404
+
 
 # --- Тесты фильтрации ---
 async def test_list_groups_filter_name_like(
@@ -154,9 +154,7 @@ async def test_list_groups_filter_name_like(
         g3 = await manager.create({"name": name3, "company_id": test_company.id})
 
     response = await async_client.get(
-        GROUPS_ENDPOINT,
-        headers=superuser_token_headers,
-        params={"name__like": prefix}
+        GROUPS_ENDPOINT, headers=superuser_token_headers, params={"name__like": prefix}
     )
     assert response.status_code == 200
     data = response.json()
@@ -166,11 +164,12 @@ async def test_list_groups_filter_name_like(
     assert str(g2.id) in returned_ids
     assert str(g3.id) in returned_ids
 
+
 async def test_list_groups_filter_company_id(
     async_client: AsyncClient,
     superuser_token_headers: dict,
     dam_factory_test: DataAccessManagerFactory,
-    test_company: models.company.Company, # Первая компания
+    test_company: models.company.Company,  # Первая компания
 ):
     """Тест фильтрации групп по company_id."""
     # Создаем вторую компанию и группу в ней
@@ -180,15 +179,19 @@ async def test_list_groups_filter_company_id(
         company_manager = dam_factory_test.get_manager("Company")
         company2 = await company_manager.create({"name": company2_name})
         group_manager = dam_factory_test.get_manager("Group")
-        g_comp2 = await group_manager.create({"name": group_in_comp2_name, "company_id": company2.id})
+        g_comp2 = await group_manager.create(
+            {"name": group_in_comp2_name, "company_id": company2.id}
+        )
         # Создаем группу в первой компании
-        g_comp1 = await group_manager.create({"name": f"Group Comp1 {uuid4()}", "company_id": test_company.id})
+        g_comp1 = await group_manager.create(
+            {"name": f"Group Comp1 {uuid4()}", "company_id": test_company.id}
+        )
 
     # Фильтруем по ID первой компании
     response = await async_client.get(
         GROUPS_ENDPOINT,
         headers=superuser_token_headers,
-        params={"company_id": str(test_company.id)}
+        params={"company_id": str(test_company.id)},
     )
     assert response.status_code == 200
     data = response.json()

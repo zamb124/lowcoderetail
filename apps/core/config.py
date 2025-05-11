@@ -1,15 +1,21 @@
 # core/app/config.py
 import os
 import logging
-from typing import List, Optional, Union  # Optional может понадобиться для полей без значения по умолчанию
+from typing import (
+    List,
+    Optional,
+    Union,
+)  # Optional может понадобиться для полей без значения по умолчанию
 
 # Импортируем базовый класс и конфигурацию из SDK
 from core_sdk.config import BaseAppSettings, SettingsConfigDict
+
 # Импортируем типы Pydantic для валидации
 from pydantic import PostgresDsn, RedisDsn, Field, EmailStr, field_validator
 
 # Настройка логгера для этого модуля
-logger = logging.getLogger("app.config") # Имя логгера соответствует пути модуля
+logger = logging.getLogger("app.config")  # Имя логгера соответствует пути модуля
+
 
 class Settings(BaseAppSettings):
     """
@@ -18,6 +24,7 @@ class Settings(BaseAppSettings):
     и добавляет/переопределяет специфичные для Core параметры.
     Загружает значения из переменных окружения и .env файла.
     """
+
     # --- Переопределение базовых настроек ---
     PROJECT_NAME: str = "CoreService"
     # LOGGING_LEVEL: str = Field("INFO", examples=["DEBUG", "INFO", "WARNING", "ERROR"]) # Наследуется из BaseAppSettings
@@ -26,30 +33,46 @@ class Settings(BaseAppSettings):
     # DB_MAX_OVERFLOW: int = 5 # Наследуется из BaseAppSettings
 
     # --- Специфичные настройки Core ---
-    DATABASE_URL: PostgresDsn = Field(..., description="URL для подключения к основной базе данных PostgreSQL.")
-    REDIS_URL: RedisDsn = Field(..., description="URL для подключения к Redis (для Taskiq или кэширования).")
+    DATABASE_URL: PostgresDsn = Field(
+        ..., description="URL для подключения к основной базе данных PostgreSQL."
+    )
+    REDIS_URL: RedisDsn = Field(
+        ..., description="URL для подключения к Redis (для Taskiq или кэширования)."
+    )
     ALGORITHM: str = Field("HS256", description="Алгоритм подписи JWT токенов.")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(60 * 24, description="Время жизни access токена в минутах (1 день).")
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = Field(60 * 24 * 7, description="Время жизни refresh токена в минутах (7 дней).")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(
+        60 * 24, description="Время жизни access токена в минутах (1 день)."
+    )
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = Field(
+        60 * 24 * 7, description="Время жизни refresh токена в минутах (7 дней)."
+    )
 
     # Настройки для создания первого суперпользователя (если используется)
-    FIRST_SUPERUSER_EMAIL: EmailStr = Field("admin@example.com", description="Email для первого суперпользователя.")
-    FIRST_SUPERUSER_PASSWORD: str = Field("changethis", description="Пароль для первого суперпользователя (рекомендуется изменить).")
+    FIRST_SUPERUSER_EMAIL: EmailStr = Field(
+        "admin@example.com", description="Email для первого суперпользователя."
+    )
+    FIRST_SUPERUSER_PASSWORD: str = Field(
+        "changethis",
+        description="Пароль для первого суперпользователя (рекомендуется изменить).",
+    )
 
     # Переопределяем ENV из BaseAppSettings, чтобы он был здесь явно виден
-    ENV: str = Field(..., description="Текущее окружение (например, 'dev', 'test', 'prod'). Влияет на загрузку .env файла.")
+    ENV: str = Field(
+        ...,
+        description="Текущее окружение (например, 'dev', 'test', 'prod'). Влияет на загрузку .env файла.",
+    )
 
     # --- Конфигурация Pydantic Settings ---
     model_config = SettingsConfigDict(
         # Указываем путь к .env файлу, который был выбран ранее
-        env_file='.env' if os.getenv('ENV') != 'test' else '.env.test',
-        env_file_encoding='utf-8',
-        case_sensitive=True, # Имена переменных окружения чувствительны к регистру
-        extra='ignore' # Игнорировать лишние переменные в .env файле или окружении
+        env_file=".env" if os.getenv("ENV") != "test" else ".env.test",
+        env_file_encoding="utf-8",
+        case_sensitive=True,  # Имена переменных окружения чувствительны к регистру
+        extra="ignore",  # Игнорировать лишние переменные в .env файле или окружении
     )
 
     # --- Валидаторы (пример) ---
-    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Optional[Union[str, List[str]]]) -> List[str]:
         """
@@ -58,7 +81,7 @@ class Settings(BaseAppSettings):
         """
         if isinstance(v, str) and v:
             # Разделяем строку по запятым и удаляем пробелы
-            return [origin.strip() for origin in v.split(',') if origin.strip()]
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         elif isinstance(v, list):
             # Удаляем пустые строки и пробелы из списка
             return [str(origin).strip() for origin in v if str(origin).strip()]

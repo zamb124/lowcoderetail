@@ -1,13 +1,14 @@
 # purchase/app/models/purchase_order.py
 import logging
 import uuid
-from typing import Optional, List # List может понадобиться для связей в будущем
-from sqlmodel import Field, Relationship # Relationship для будущих связей
+from typing import Optional, List  # List может понадобиться для связей в будущем
+from sqlmodel import Field, Relationship  # Relationship для будущих связей
 from core_sdk.db import BaseModelWithMeta
 from core_sdk.filters.base import DefaultFilter
 from enum import Enum
 
 logger = logging.getLogger("app.models.purchase_order")
+
 
 class PurchaseOrderStatus(str, Enum):
     DRAFT = "draft"
@@ -18,6 +19,7 @@ class PurchaseOrderStatus(str, Enum):
     RECEIVED = "received"
     CANCELLED = "cancelled"
 
+
 class PurchaseOrder(BaseModelWithMeta, table=True):
     __tablename__ = "purchase_orders"
 
@@ -26,17 +28,18 @@ class PurchaseOrder(BaseModelWithMeta, table=True):
     # company_id уже есть в BaseModelWithMeta и будет ID компании, создавшей заказ
 
     status: PurchaseOrderStatus = Field(
-        default=PurchaseOrderStatus.DRAFT,
-        index=True,
-        description="Текущий статус заказа на закупку"
+        default=PurchaseOrderStatus.DRAFT, index=True, description="Текущий статус заказа на закупку"
     )
 
     # Пример дополнительных полей
-    expected_delivery_date: Optional[str] = Field(default=None, description="Ожидаемая дата поставки (в ISO формате)") # Используем str для простоты, можно datetime
+    expected_delivery_date: Optional[str] = Field(
+        default=None, description="Ожидаемая дата поставки (в ISO формате)"
+    )  # Используем str для простоты, можно datetime
     total_amount: Optional[float] = Field(default=None, description="Общая сумма заказа")
 
     # В будущем здесь могут быть связи, например, с позициями заказа (PurchaseOrderLine)
     # lines: List["PurchaseOrderLine"] = Relationship(back_populates="purchase_order")
+
 
 class PurchaseOrderFilter(DefaultFilter):
     order_number: Optional[str] = Field(default=None, description="Фильтр по точному номеру заказа")
@@ -48,5 +51,6 @@ class PurchaseOrderFilter(DefaultFilter):
     class Constants(DefaultFilter.Constants):
         model = PurchaseOrder
         search_model_fields = ["order_number"]
+
 
 logger.debug("PurchaseOrder model and PurchaseOrderFilter defined.")

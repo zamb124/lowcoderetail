@@ -8,53 +8,96 @@ from starlette import status
 from core_sdk.dependencies.auth import get_current_user, get_optional_current_user
 from core_sdk.schemas.auth_user import AuthenticatedUser
 from core_sdk.frontend import get_templates
-from ..config import settings # Настройки текущего сервиса frontend
+from ..config import settings  # Настройки текущего сервиса frontend
 
 logger = logging.getLogger("frontend.api.ui")
 
 # Роутер для основных страниц UI и фрагментов
 router = APIRouter(tags=["User Interface"])
 
+
 # --- UI Фрагменты ---
-@router.get("/ui/header", response_class=HTMLResponse, include_in_schema=False, name="get_header_fragment")
-async def get_header_fragment(request: Request, user: Optional[AuthenticatedUser] = Depends(get_optional_current_user)):
+@router.get(
+    "/ui/header",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    name="get_header_fragment",
+)
+async def get_header_fragment(
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+):
     templates = get_templates()
     context = {
-        "request": request, "user": user, "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH
+        "request": request,
+        "user": user,
+        "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
     }
     return templates.TemplateResponse("components/_header.html", context)
 
-@router.get("/ui/sidebar", response_class=HTMLResponse, include_in_schema=False, name="get_sidebar_fragment")
-async def get_sidebar_fragment(request: Request, user: Optional[AuthenticatedUser] = Depends(get_optional_current_user)):
+
+@router.get(
+    "/ui/sidebar",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    name="get_sidebar_fragment",
+)
+async def get_sidebar_fragment(
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+):
     templates = get_templates()
     context = {
-        "request": request, "user": user, "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH
+        "request": request,
+        "user": user,
+        "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
     }
     return templates.TemplateResponse("components/_sidebar.html", context)
 
-@router.get("/ui/footer", response_class=HTMLResponse, include_in_schema=False, name="get_footer_fragment")
+
+@router.get(
+    "/ui/footer",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    name="get_footer_fragment",
+)
 async def get_footer_fragment(request: Request):
     templates = get_templates()
-    context = {
-        "request": request, "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH
-    }
+    context = {"request": request, "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH}
     return templates.TemplateResponse("components/_footer.html", context)
 
-@router.get("/ui/dashboard", response_class=HTMLResponse, include_in_schema=False, name="get_dashboard_content")
-async def get_dashboard_content(request: Request, user: AuthenticatedUser = Depends(get_current_user)):
+
+@router.get(
+    "/ui/dashboard",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+    name="get_dashboard_content",
+)
+async def get_dashboard_content(
+    request: Request, user: AuthenticatedUser = Depends(get_current_user)
+):
     templates = get_templates()
-    dashboard_data = {"metric1": 123, "metric2": "abc"} # Пример данных
+    dashboard_data = {"metric1": 123, "metric2": "abc"}  # Пример данных
     context = {
-        "request": request, "user": user, "data": dashboard_data, "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH
+        "request": request,
+        "user": user,
+        "data": dashboard_data,
+        "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
     }
     return templates.TemplateResponse("dashboard.html", context)
 
 
-@router.get("/{model_name_plural}/list-page", response_class=HTMLResponse, name="get_model_list_page")
+@router.get(
+    "/{model_name_plural}/list-page",
+    response_class=HTMLResponse,
+    name="get_model_list_page",
+)
 async def get_model_list_page(
-        request: Request,
-        model_name_plural: str, # Например, "users", "companies"
-        user: Optional[AuthenticatedUser] = Depends(get_optional_current_user) # Или get_current_user
+    request: Request,
+    model_name_plural: str,  # Например, "users", "companies"
+    user: Optional[AuthenticatedUser] = Depends(
+        get_optional_current_user
+    ),  # Или get_current_user
 ):
     """
     Отдает общую страницу-обертку для списка моделей,
@@ -76,16 +119,24 @@ async def get_model_list_page(
     context = {
         "request": request,
         "user": user,
-        "model_name": model_name_singular, # Передаем имя модели для использования в hx-get
+        "model_name": model_name_singular,  # Передаем имя модели для использования в hx-get
         "title": f"Список: {model_name_singular.capitalize()}",
         "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
     }
     return templates.TemplateResponse("list_page_wrapper.html", context)
+
+
 # --- Основные страницы ---
 @router.get("/", response_class=HTMLResponse, include_in_schema=False, name="read_root")
-async def read_root(request: Request, user: Optional[AuthenticatedUser] = Depends(get_optional_current_user)):
+async def read_root(
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+):
     if not user:
-        return RedirectResponse(url=request.url_for('login_page'), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        return RedirectResponse(
+            url=request.url_for("login_page"),
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+        )
 
     templates = get_templates()
     context = {
@@ -93,11 +144,14 @@ async def read_root(request: Request, user: Optional[AuthenticatedUser] = Depend
         "user": user,
         "title": "Панель управления",
         "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
-        #"SERVICE_STATIC_URL": request.url_for('frontend_static', path='') if 'frontend_static' in request.app.router.routes_by_name else None
+        # "SERVICE_STATIC_URL": request.url_for('frontend_static', path='') if 'frontend_static' in request.app.router.routes_by_name else None
     }
     return templates.TemplateResponse("index.html", context)
 
-@router.get("/login", response_class=HTMLResponse, include_in_schema=False, name="login_page")
+
+@router.get(
+    "/login", response_class=HTMLResponse, include_in_schema=False, name="login_page"
+)
 async def login_page(request: Request):
     logger.debug("Serving login page.")
     templates = get_templates()
@@ -105,6 +159,6 @@ async def login_page(request: Request):
         "request": request,
         "title": "Вход",
         "SDK_STATIC_URL": settings.SDK_STATIC_URL_PATH,
-        "login_post_url": request.url_for('proxy_login')
+        "login_post_url": request.url_for("proxy_login"),
     }
     return templates.TemplateResponse("login.html", context)

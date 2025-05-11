@@ -2,46 +2,6 @@
 {# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
 
 <form id="{{ ctx.filter_form_id }}" class="mb-3 p-3 border rounded bg-light datatable-filter-form"
-      {# Убираем hx-get, hx-target, hx-swap с формы #}
-      {# Добавляем hx-trigger на изменение любого инпута/селекта внутри формы #}
-      {# При изменении, форма будет генерировать событие 'filterChanged' на себе #}
-      {# Мы также можем использовать HX-Trigger заголовок, если бы форма сабмитилась, #}
-      {# но для чисто клиентского взаимодействия этого достаточно. #}
-      {# Или, чтобы событие было глобальным, можно использовать JS: #}
-      {# onchange="htmx.trigger(document.body, 'filterChanged', {formId: this.id})" #}
-      {# Но попробуем через стандартные механизмы HTMX, если возможно #}
-      {# Простой вариант: при изменении формы, она сама себя "обновляет" без реального свапа, #}
-      {# но это сгенерирует событие, которое может слушать таблица. #}
-      {# Однако, это не очень чисто. #}
-
-      {# Лучший подход: форма при изменении отправляет событие, которое слушает таблица. #}
-      {# Мы можем использовать атрибут `hx-trigger` на форме, который будет вызывать #}
-      {# `htmx.trigger` на `body` или другом общем предке. #}
-      {# Но HTMX не имеет встроенного `hx-action` для вызова `htmx.trigger`. #}
-
-      {# Вариант с `hyperscript` (если используется): #}
-      {# _="on input or change from <input/> or <select/> within me trigger filterChanged on body" #}
-
-      {# Вариант с небольшим JS на каждом поле фильтра (менее предпочтительно, но работает): #}
-      {# Поля фильтра будут иметь onchange="htmx.trigger('#table-id', 'refreshWithFilters')" #}
-
-      {# Самый чистый HTMX-way без JS - это когда форма сама что-то делает, #}
-      {# а таблица слушает событие от этого действия. #}
-      {# Если форма не должна сабмититься, а только генерировать событие, #}
-      {# это немного сложнее без JS или hyperscript. #}
-
-      {# Давайте сделаем так: форма будет иметь hx-post на "фиктивную" ручку, #}
-      {# которая в ответе через HX-Trigger заголовок скажет таблице обновиться. #}
-      {# Это серверный подход. #}
-
-      {# Для чисто клиентского подхода без JS: #}
-      {# Поля фильтра могут иметь `hx-trigger="change" hx-target="#some-event-emitter" hx-vals='{"eventName": "filterChanged"}' ...` #}
-      {# А `#some-event-emitter` будет генерировать событие. #}
-
-      {# Наиболее простой и распространенный подход с HTMX - таблица слушает изменения в форме. #}
-      {# Это делается через `hx-trigger` на таблице, который слушает события от элементов формы. #}
-      {# `hx-trigger="input changed delay:500ms from:#{{ ctx.filter_form_id }} input, change from:#{{ ctx.filter_form_id }} select"` #}
-      {# Это значит, что `hx-` атрибуты на полях фильтра не нужны. #}
       >
     <h5 class="mb-3">Фильтры для: {{ ctx.model_name }}</h5>
     <div class="row g-2 align-items-end">
@@ -57,7 +17,6 @@
         <div class="col-md-auto align-self-end mb-3">
              <a href="#" class="btn btn-sm btn-outline-secondary"
                 title="Сбросить фильтры"
-                {# При сбросе мы также должны триггернуть обновление таблицы #}
                 {# Самый простой способ - JS для очистки формы и затем триггер события #}
                 onclick="document.getElementById('{{ ctx.filter_form_id }}').reset(); htmx.trigger(htmx.find('{{ ctx.table_target_id }}'), 'refreshData'); return false;">
                  <i class="ti ti-reload"></i> Сбросить

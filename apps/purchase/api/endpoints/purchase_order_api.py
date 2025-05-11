@@ -2,7 +2,7 @@
 import logging
 from fastapi import Depends
 from core_sdk.crud.factory import CRUDRouterFactory
-from core_sdk.dependencies.auth import get_current_user # Для защиты эндпоинтов
+from core_sdk.dependencies.auth import get_current_user  # Для защиты эндпоинтов
 
 logger = logging.getLogger("app.api.endpoints.purchase_order_api")
 

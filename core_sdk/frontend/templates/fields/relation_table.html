@@ -5,9 +5,6 @@
     <span  class="fw-bold text-primar needs-title-resolution w-100"
        data-model-name="{{ related_model_name }}"
        data-item-id="{{ item_id_val }}"
-{#       hx-get="{{ url_for('get_view', model_name=related_model_name, item_id=item_id_val) }}"#}
-{#       hx-target="#modal-placeholder" {# Открываем в модалке, как обсуждали #}
-{#       hx-swap="innerHTML"#}
        title="Просмотр {{ related_model_name }} {{ item_id_val }}">
         {{- item_id_val|string|truncate(8, True, '...') -}} {# Изначально показываем ID или часть ID #}
     </span>
