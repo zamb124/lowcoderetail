@@ -2,12 +2,11 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from uuid import uuid4, UUID
-from typing import Dict, List
+from uuid import uuid4
 
 from starlette.exceptions import HTTPException
 
-from apps.core import schemas, models
+from apps.core import models
 from apps.core.config import settings
 from core_sdk.data_access import (
     DataAccessManagerFactory,

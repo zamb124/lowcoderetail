@@ -1,7 +1,6 @@
 # apps/frontend/app/ws_manager.py
 import logging
-import json
-from typing import Dict, List, Set, Optional
+from typing import Dict, Set, Optional
 from fastapi import WebSocket
 from starlette.websockets import WebSocketState
 

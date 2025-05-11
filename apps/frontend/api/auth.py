@@ -1,7 +1,7 @@
 # apps/frontend/app/api/auth.py
 import logging
 import httpx
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse  # Для ошибок в proxy_login
 from starlette import status
@@ -119,7 +119,7 @@ async def proxy_login_for_access_token(
             content='<div class="alert alert-danger mt-2">Ошибка подключения к сервису аутентификации.</div>',
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
-    except Exception as e:
+    except Exception:
         logger.exception(
             f"BFF Login Proxy: Unexpected error during login for user {form_data.username}."
         )

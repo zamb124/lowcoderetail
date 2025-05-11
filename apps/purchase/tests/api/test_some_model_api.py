@@ -1,8 +1,9 @@
 # purchase/app/tests/api/test_some_model_api.py
-import pytest, uuid  # Добавлен uuid
+import pytest
+import uuid  # Добавлен uuid
 from httpx import AsyncClient
 from purchase.app.config import settings as service_settings
-from purchase.app.schemas.some_model_schema import SomeModelCreate, SomeModelRead
+from purchase.app.schemas.some_model_schema import SomeModelCreate
 from purchase.app.models.some_model import SomeModel
 
 pytestmark = pytest.mark.asyncio

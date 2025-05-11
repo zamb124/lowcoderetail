@@ -1,28 +1,23 @@
 # core/app/tests/conftest.py
 
 import asyncio
-import contextvars
 import os
 import sys
 import importlib  # Для перезагрузки модулей
-from typing import AsyncGenerator, Generator, Any, Dict, Optional
+from typing import AsyncGenerator, Generator, Dict
 from uuid import uuid4
 
-import httpx
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
-    AsyncSession,
-    async_sessionmaker,
     AsyncEngine,
 )
 from sqlalchemy.pool import NullPool
 from alembic.config import Config
 from alembic import command
-from starlette.exceptions import HTTPException
 from taskiq import (
     InMemoryBroker,
     AsyncBroker,
@@ -53,13 +48,9 @@ from core_sdk.db.session import (
     init_db,
     close_db,
     managed_session,
-    get_session_dependency,
 )  # Используем новую зависимость
 from core_sdk.data_access import (
     DataAccessManagerFactory,
-    get_dam_factory,
-    get_optional_token,
-    get_global_http_client,
 )
 
 # Конкретные менеджеры для type hinting (опционально, но полезно)
@@ -79,7 +70,7 @@ def set_test_environment():
     }
     original_values = {}
 
-    print(f"\n--- Setting Test Environment Variables ---")
+    print("\n--- Setting Test Environment Variables ---")
     for key, value in test_env_vars.items():
         print(f"Setting {key}={value}")
         original_values[key] = os.environ.get(key)
@@ -107,7 +98,7 @@ def set_test_environment():
     yield  # Запускаем тесты
 
     # --- Очистка после тестов ---
-    print(f"\n--- Cleaning Up Test Environment Variables ---")
+    print("\n--- Cleaning Up Test Environment Variables ---")
     for key, original_value in original_values.items():
         print(f"Restoring {key}")
         if original_value is None:

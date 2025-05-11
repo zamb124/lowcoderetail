@@ -32,7 +32,6 @@ from core_sdk.registry import ModelRegistry
 from core_sdk.data_access import DataAccessManagerFactory
 
 # Для фикстуры core_superuser_token
-from core_sdk.security import create_access_token  # Понадобится, если будем мокать токен, но лучше логиниться
 import secrets  # Для генерации SECRET_KEY в .env.test, если его нет
 
 
@@ -53,13 +52,13 @@ def test_settings(set_test_environment_var) -> AppSettingsClass:
     if not os.path.exists(env_test_path):
         print(f"Создание .env.test для сервиса Purchase в {env_test_path}")
         with open(env_test_path, "w") as f:
-            f.write(f"DATABASE_URL=postgresql+asyncpg://main_user:main_password@db:5432/purchase_test_db\n")
-            f.write(f"REDIS_URL=redis://redis:6379/14\n")
+            f.write("DATABASE_URL=postgresql+asyncpg://main_user:main_password@db:5432/purchase_test_db\n")
+            f.write("REDIS_URL=redis://redis:6379/14\n")
             f.write(f"SECRET_KEY={secrets.token_hex(32)}\n")
-            f.write(f"ENV=test\n")
-            f.write(f"PROJECT_NAME=PurchaseTestService\n")
+            f.write("ENV=test\n")
+            f.write("PROJECT_NAME=PurchaseTestService\n")
             f.write(f"PORT_PURCHASE={os.getenv('PORT_PURCHASE', '9902')}\n")
-            f.write(f"CORE_SERVICE_URL=http://core:8000\n")  # Важно для удаленных тестов
+            f.write("CORE_SERVICE_URL=http://core:8000\n")  # Важно для удаленных тестов
     return AppSettingsClass(_env_file=env_test_path)
 
 
@@ -80,7 +79,7 @@ async def manage_service_db_for_tests_purchase(test_settings: AppSettingsClass):
         yield
         return
 
-    print(f"\n--- Настройка БД для тестов сервиса: Purchase ---")
+    print("\n--- Настройка БД для тестов сервиса: Purchase ---")
     sdk_init_db(str(test_settings.DATABASE_URL), engine_options={"poolclass": NullPool, "echo": False})
     from purchase.app import models as purchase_models  # noqa F401
 
@@ -88,9 +87,9 @@ async def manage_service_db_for_tests_purchase(test_settings: AppSettingsClass):
     await create_db_and_tables()
     ModelRegistry.clear()  # Очищаем перед конфигурацией для изоляции тестов
     registry_config.configure_purchase_registry()
-    print(f"ModelRegistry сконфигурирован для Purchase.")
+    print("ModelRegistry сконфигурирован для Purchase.")
     yield
-    print(f"--- Очистка БД после тестов сервиса: Purchase ---")
+    print("--- Очистка БД после тестов сервиса: Purchase ---")
     await sdk_close_db()
 
 
@@ -186,7 +185,7 @@ async def async_client_purchase(
     test_settings: AppSettingsClass, db_session_purchase
 ) -> AsyncGenerator[AsyncClient, None]:
     transport = ASGITransport(app=fastapi_app)  # type: ignore
-    async with AsyncClient(transport=transport, base_url=f"http://test_purchase") as client:
+    async with AsyncClient(transport=transport, base_url="http://test_purchase") as client:
         yield client
     fastapi_app.dependency_overrides.clear()
 

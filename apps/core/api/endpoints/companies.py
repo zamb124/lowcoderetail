@@ -1,12 +1,10 @@
 # core/app/api/endpoints/companies.py
 import logging
-from typing import Optional  # List не используется напрямую
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status  # APIRouter импортируется фабрикой
 
 # taskiq.TaskiqError не используется, TaskiqResult используется для type hinting
-from taskiq import TaskiqResult  # Оставляем для type hinting
 
 from core_sdk.crud.factory import CRUDRouterFactory
 from core_sdk.data_access import DataAccessManagerFactory, get_dam_factory
@@ -117,7 +115,7 @@ async def activate_company_and_wait(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to activate company: {e}",
         )
-    except Exception as e:
+    except Exception:
         logger.exception(f"Unexpected error during company {company_id} activation.")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

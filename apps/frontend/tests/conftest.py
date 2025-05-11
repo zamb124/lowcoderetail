@@ -5,9 +5,7 @@ import sys
 import pytest
 import pytest_asyncio
 from typing import AsyncGenerator, Generator, Any, Dict
-import httpx
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy.pool import NullPool  # Хотя БД не используется, SDK может ожидать опции
 
 # --- Добавляем корень проекта в sys.path ---
 # Путь к директории apps/
@@ -27,15 +25,8 @@ from frontend.app.main import app as fastapi_app  # Наше FastAPI прило�
 from frontend.app import registry_config  # Для инициализации registry
 from core_sdk.registry import ModelRegistry
 from core_sdk.data_access import (
-    DataAccessManagerFactory,
-    get_dam_factory,
-    get_optional_token,
     get_global_http_client,
 )
-from core_sdk.db.session import (
-    init_db as sdk_init_db,
-    close_db as sdk_close_db,
-)  # Для жизненного цикла SDK
 
 
 # Фикстура для установки тестового окружения

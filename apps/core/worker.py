@@ -1,5 +1,4 @@
 # core/app/worker.py
-import asyncio
 import logging
 import os
 
@@ -14,7 +13,6 @@ logger = logging.getLogger("app.worker")  # Логгер для воркера
 from core_sdk.worker_setup import initialize_worker_context, shutdown_worker_context
 
 # Импортируем брокер из SDK (Taskiq CLI будет его использовать)
-from core_sdk.broker.setup import broker
 # Импортируем задачи, чтобы Taskiq их обнаружил при запуске через этот файл (если нужно)
 # Обычно Taskiq CLI находит их сам через --fs-discover
 # from core_sdk.broker import tasks # noqa: F401

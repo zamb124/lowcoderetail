@@ -1,8 +1,7 @@
 # core/app/tests/api/test_users.py
 import pytest
 from httpx import AsyncClient
-from uuid import uuid4, UUID
-from typing import Dict, List
+from uuid import uuid4
 
 from apps.core import schemas, models
 from apps.core.config import settings

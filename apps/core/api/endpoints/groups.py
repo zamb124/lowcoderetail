@@ -1,12 +1,10 @@
 # core/app/api/endpoints/groups.py
 import logging
-from typing import List  # Optional не используется напрямую
 from uuid import UUID
 
 from fastapi import (
     Depends,
     HTTPException,
-    status,
     Body,
 )  # APIRouter и Body не нужны здесь напрямую
 # sqlalchemy.orm.selectinload не используется
@@ -17,10 +15,8 @@ from core_sdk.data_access import (
     get_dam_factory,
     BaseDataAccessManager,
 )
-from core_sdk.exceptions import CoreSDKError  # Для обработки ошибок DAM
 from core_sdk.dependencies.auth import get_current_user
 
-from ... import models  # Нужны модели для проверки связей
 from ... import schemas  # Нужны схемы для response_model
 # UserDataAccessManager не используется напрямую в этом файле
 
@@ -77,7 +73,7 @@ async def assign_permission_codename_to_group(
                 f"Permission '{permission_codename}' assigned to group {group_id}."
             )
             return updated_group
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"Failed to assign permission '{permission_codename}' to group {group_id}"
             )
@@ -118,7 +114,7 @@ async def revoke_permission_codename_from_group(
                 f"Permission '{permission_codename}' revoked from group {group_id}."
             )
             return updated_group
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"Failed to revoke permission '{permission_codename}' from group {group_id}"
             )

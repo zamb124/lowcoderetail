@@ -29,7 +29,7 @@ async def read_languages():
         languages = await i18n_service.get_languages()
         logger.debug(f"Returning {len(languages)} languages.")
         return languages
-    except Exception as e:
+    except Exception:
         logger.exception("Error retrieving languages from i18n_service.")
         # В данном случае, если сервис i18n недоступен, это может быть 503
         raise HTTPException(
@@ -52,7 +52,7 @@ async def read_countries():
         countries = await i18n_service.get_countries()
         logger.debug(f"Returning {len(countries)} countries.")
         return countries
-    except Exception as e:
+    except Exception:
         logger.exception("Error retrieving countries from i18n_service.")
         raise HTTPException(
             status_code=503, detail="Country service is currently unavailable."
@@ -74,7 +74,7 @@ async def read_currencies():
         currencies = await i18n_service.get_currencies()
         logger.debug(f"Returning {len(currencies)} currencies.")
         return currencies
-    except Exception as e:
+    except Exception:
         logger.exception("Error retrieving currencies from i18n_service.")
         raise HTTPException(
             status_code=503, detail="Currency service is currently unavailable."

@@ -4,7 +4,7 @@ import uuid
 from typing import Optional, List  # Убираем TYPE_CHECKING, если импорт прямой
 
 from sqlmodel import SQLModel
-from pydantic import EmailStr, Field
+from pydantic import Field
 
 # Абсолютный импорт схемы пользователя из SDK
 from core_sdk.schemas.user import UserRead

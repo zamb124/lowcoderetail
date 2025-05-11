@@ -1,18 +1,10 @@
 # core/app/api/endpoints/users.py
 import logging
-from typing import (
-    List,
-    Optional,
-)  # List, Optional могут быть нужны для кастомных эндпоинтов
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, status  # APIRouter не нужен здесь напрямую
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from core_sdk.crud.factory import CRUDRouterFactory
-from core_sdk.db.session import (
-    get_current_session,
-)  # Переименовали get_session на get_current_session
 from core_sdk.data_access import (
     DataAccessManagerFactory,
     get_dam_factory,
@@ -100,7 +92,7 @@ async def assign_user_to_group_endpoint(  # Переименовал для яс
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to process user-group assignment.",
         )
-    except Exception as e:
+    except Exception:
         logger.exception(
             f"API: Unexpected error assigning user {user_id} to group {group_id}."
         )

@@ -19,7 +19,6 @@ from core_sdk.exceptions import CoreSDKError  # Для обработки оши
 
 from ...config import settings  # Используем app. для импорта из текущего приложения
 from ...data_access.user_manager import UserDataAccessManager
-from ...models.user import User as UserModel  # Для проверки статуса пользователя
 
 logger = logging.getLogger(__name__)  # Имя будет app.api.endpoints.auth
 
@@ -84,7 +83,7 @@ async def login_for_access_token(
                 # Добавляем права из каждой группы в set для уникальности
                 user_permissions.update(group.permissions)
         logger.debug(f"Collected permissions for user {user.email}: {user_permissions}")
-    except Exception as e:
+    except Exception:
         logger.exception(
             f"Failed to load groups or permissions for user {user.email} during login."
         )
@@ -202,7 +201,7 @@ async def refresh_access_token(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service is temporarily unavailable.",
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error during token refresh.")
         # Не передаем детализацию исходной ошибки клиенту из соображений безопасности
         raise credentials_exception  # Общее сообщение об ошибке валидации

@@ -1,7 +1,7 @@
 # purchase/app/schemas/purchase_order_schema.py
 import logging
 import uuid
-from typing import Optional, List
+from typing import Optional
 from sqlmodel import SQLModel, Field
 from datetime import datetime  # Для created_at, updated_at
 from ..models.purchase_order import PurchaseOrderStatus  # Импортируем Enum статуса

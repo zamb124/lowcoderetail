@@ -7,7 +7,6 @@ from core_sdk.app_setup import create_app_with_sdk_setup
 
 # Локальные импорты Core
 from .config import settings
-from . import registry_config
 
 # --- ИМПОРТИРУЕМ СХЕМЫ ДЛЯ REBUILD ---
 from . import schemas as app_schemas

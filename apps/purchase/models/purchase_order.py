@@ -2,7 +2,7 @@
 import logging
 import uuid
 from typing import Optional, List  # List может понадобиться для связей в будущем
-from sqlmodel import Field, Relationship  # Relationship для будущих связей
+from sqlmodel import Field  # Relationship для будущих связей
 from core_sdk.db import BaseModelWithMeta
 from core_sdk.filters.base import DefaultFilter
 from enum import Enum

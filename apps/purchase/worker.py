@@ -7,7 +7,6 @@ logging.basicConfig(level=log_level_str)
 logger = logging.getLogger("app.worker")
 
 from core_sdk.worker_setup import initialize_worker_context, shutdown_worker_context
-from core_sdk.broker.setup import broker  # Taskiq CLI будет его использовать
 # from core_sdk.broker import tasks # noqa: F401 # Если у вас есть глобальные задачи в SDK
 
 from .config import settings  # Настройки сервиса Purchase

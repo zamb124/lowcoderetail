@@ -6,7 +6,7 @@ from core_sdk.config import (
     BaseAppSettings,
     SettingsConfigDict,
 )  # Используем базовые настройки SDK
-from pydantic import PostgresDsn, RedisDsn, Field, field_validator, HttpUrl
+from pydantic import RedisDsn, Field, field_validator, HttpUrl
 
 logger = logging.getLogger("app.config")
 

@@ -1,6 +1,5 @@
 # core/app/tests/api/test_companies.py
-import asyncio
-from uuid import uuid4, UUID
+from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 from taskiq import InMemoryBroker

@@ -2,8 +2,6 @@
 import logging
 import os
 from fastapi import (
-    FastAPI,
-    Request,
     WebSocket,
 )  # WebSocketDisconnect убран, если не используется
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +17,6 @@ from core_sdk.frontend import (
 # --- Frontend Service Imports ---
 from .config import settings
 from . import registry_config  # noqa F401
-from .ws_manager import manager as ws_manager  # Оставляем, если WS нужен
 from .api import bff_api_router  # Импортируем главный роутер
 
 # --- Настройка логгирования ---

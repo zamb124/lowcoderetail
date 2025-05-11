@@ -78,7 +78,7 @@ class CompanyDataAccessManager(
             else:
                 logger.debug(f"Company with name '{name}' not found.")
                 return None
-        except Exception as e:
+        except Exception:
             logger.exception(f"Company DAM: Error fetching company by name '{name}'.")
             # Не пробрасываем ошибку дальше, возвращаем None или можно выбросить специфичное исключение
             return None
@@ -238,7 +238,7 @@ class CompanyDataAccessManager(
                 logger.info(
                     f"Successfully created company '{new_company.name}' with ID {new_company.id} and set company_id."
                 )
-            except Exception as e:
+            except Exception:
                 # Откат произойдет в managed_session
                 logger.exception(
                     f"Company DAM: Error committing company_id update for new company {new_company.id}."

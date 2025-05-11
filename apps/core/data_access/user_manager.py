@@ -1,6 +1,6 @@
 # core/app/data_access/user_manager.py
 import logging
-from typing import Optional, List, Any, Dict, Union
+from typing import Optional, Any, Dict
 from uuid import UUID
 import datetime  # Нужен для datetime.now()
 
@@ -177,7 +177,7 @@ class UserDataAccessManager(
             else:
                 logger.debug(f"User with email '{email}' not found.")
                 return None
-        except Exception as e:
+        except Exception:
             logger.exception(
                 f"UserDataAccessManager: Error fetching user by email '{email}'."
             )
@@ -230,7 +230,7 @@ class UserDataAccessManager(
                 # Обновляем только измененное поле, чтобы не перезаписывать другие возможные изменения
                 await self.session.refresh(user, attribute_names=["last_login"])
                 logger.info(f"Successfully updated last_login for user {user.email}.")
-            except Exception as e:
+            except Exception:
                 # Откат произойдет в managed_session
                 logger.exception(
                     f"Error committing last_login update for user {user.email}."
@@ -267,7 +267,7 @@ class UserDataAccessManager(
 
         try:
             group = await self.session.get(models.group.Group, group_id)
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error fetching group {group_id} during user assignment.")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -292,7 +292,7 @@ class UserDataAccessManager(
             # Явный refresh может быть избыточен, если нет специфичных требований к свежести данных.
             # await self.session.refresh(user, attribute_names=['groups'])
             pass  # SQLAlchemy должен сам загрузить user.groups при первом доступе
-        except Exception as e_refresh:
+        except Exception:
             logger.exception(
                 f"Failed to ensure user.groups collection is loaded for user {user_id}."
             )
@@ -312,7 +312,7 @@ class UserDataAccessManager(
                 logger.info(
                     f"User {user.id} ('{user.email}') successfully assigned to group {group.id} ('{group.name}')."
                 )
-            except IntegrityError as e:  # Ловим специфичные ошибки БД
+            except IntegrityError:  # Ловим специфичные ошибки БД
                 await self.session.rollback()
                 logger.error(
                     f"Database integrity error assigning user {user.id} to group {group.id}.",
@@ -323,7 +323,7 @@ class UserDataAccessManager(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Failed to assign user to group due to a data conflict.",
                 )
-            except Exception as e:
+            except Exception:
                 await self.session.rollback()
                 logger.exception(
                     f"Error committing user-group assignment for user {user.id}."
