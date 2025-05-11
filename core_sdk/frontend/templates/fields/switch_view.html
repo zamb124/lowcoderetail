@@ -16,19 +16,12 @@
             {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
 
         </label>
-    {% if field_ctx.description %}
-            <span class="form-floating-info-icon"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  data-bs-container="{% if ctx and ctx.extra and ctx.extra.modal_container_id %}{{ '#' ~ ctx.extra.modal_container_id }}{% else %}body{% endif %}"
-                  title="{{ field_ctx.description | escape }}">
-        <i class="ti ti-info-circle text-muted"></i>
-    </span>
-        {% endif %}
+
     </div>
     {% if field_ctx.errors %}
         <div class="invalid-feedback d-block mt-1">
             {{ field_ctx.errors | join(', ') }}
         </div>
     {% endif %}
+
 </div>

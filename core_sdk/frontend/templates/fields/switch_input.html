@@ -25,15 +25,7 @@
             {# Добавлен ps-2 для отступа от свитчера #}
             {{ field_ctx.label }}
             {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
-            {% if field_ctx.description %}
-            <span class="form-floating-info-icon"
-                  data-bs-toggle="tooltip"
-                  data-bs-placement="top"
-                  data-bs-container="{% if ctx and ctx.extra and ctx.extra.modal_container_id %}{{ '#' ~ ctx.extra.modal_container_id }}{% else %}body{% endif %}"
-                  title="{{ field_ctx.description | escape }}">
-        <i class="ti ti-info-circle text-muted"></i>
-    </span>
-        {% endif %}
+
         </label>
     </div>
 

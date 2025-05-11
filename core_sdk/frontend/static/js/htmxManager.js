@@ -8,7 +8,7 @@ class HtmxManager {
     }
 
     setupListeners() {
-        document.body.addEventListener('htmx:beforeRequest', function(evt) {
+        document.body.addEventListener('htmx:beforeRequest', function (evt) {
             // console.log("HTMX Before Request:", evt.detail.requestConfig);
         });
 
@@ -52,22 +52,28 @@ class HtmxManager {
             if (elementToScan) {
                 setTimeout(() => {
                     // console.log("HtmxManager: Re-initializing components and resolving titles in swapped content:", elementToScan.nodeName);
-                    this.componentInitializer.initializeAll(elementToScan);
-                    if (this.titleResolver) this.titleResolver.scanAndResolve(elementToScan);
 
                     // Логика фокуса для инлайн-редактирования
                     const inlineInput = elementToScan.querySelector('[autofocus][id*="--inline-input"]');
                     if (inlineInput) {
                         inlineInput.focus();
                         if (inlineInput.select && typeof inlineInput.select === 'function' && (inlineInput.type === 'text' || inlineInput.type === 'number' || inlineInput.type === 'email' || inlineInput.type === 'url' || inlineInput.type === 'search' || inlineInput.type === 'tel' || inlineInput.type === 'password')) {
-                            try { inlineInput.select(); } catch (e) { console.warn("Could not select text in inline input:", e); }
+                            try {
+                                inlineInput.select();
+                            } catch (e) {
+                                console.warn("Could not select text in inline input:", e);
+                            }
                         }
                     } else {
-                         const inputInsideSwapped = elementToScan.querySelector('input[autofocus][id*="--inline-input"], select[autofocus][id*="--inline-input"]');
-                         if(inputInsideSwapped){
+                        const inputInsideSwapped = elementToScan.querySelector('input[autofocus][id*="--inline-input"], select[autofocus][id*="--inline-input"]');
+                        if (inputInsideSwapped) {
                             inputInsideSwapped.focus();
-                             if (inputInsideSwapped.select && typeof inputInsideSwapped.select === 'function' && (inputInsideSwapped.type === 'text' || inputInsideSwapped.type === 'number')) {
-                                try { inputInsideSwapped.select(); } catch (e) { console.warn("Could not select text:", e); }
+                            if (inputInsideSwapped.select && typeof inputInsideSwapped.select === 'function' && (inputInsideSwapped.type === 'text' || inputInsideSwapped.type === 'number')) {
+                                try {
+                                    inputInsideSwapped.select();
+                                } catch (e) {
+                                    console.warn("Could not select text:", e);
+                                }
                             }
                         }
                     }
@@ -75,11 +81,17 @@ class HtmxManager {
                     // Показать уведомление, если были ошибки валидации (даже если статус 422 и HTML свапнулся)
                     // Это опционально, т.к. ошибки уже видны в форме.
                     if (xhr && xhr.status === 422 && event.detail.serverValidationHtmlSwapped) {
-                         this.notificationService.show("Пожалуйста, проверьте ошибки в форме.", "warning");
+                        this.notificationService.show("Пожалуйста, проверьте ошибки в форме.", "warning");
                     }
 
                 }, 50);
             }
+            htmx.onLoad((elt) => {
+                this.componentInitializer.initializeAll(elt);
+                if (this.titleResolver) {
+                    this.titleResolver.scanAndResolve(elt);
+                }
+            });
         });
 
         document.body.addEventListener('htmx:responseError', (event) => {
@@ -102,9 +114,13 @@ class HtmxManager {
                         const errorData = JSON.parse(xhr.responseText);
                         let message = `Ошибка ${xhr.status}`;
                         if (errorData.detail) {
-                            if (typeof errorData.detail === 'string') { message += `: ${errorData.detail}`; }
-                            else if (Array.isArray(errorData.detail)) { message += ': ' + errorData.detail.map(err => `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`).join('; '); }
-                            else if (typeof errorData.detail === 'object') { message += `: ${JSON.stringify(errorData.detail)}`; }
+                            if (typeof errorData.detail === 'string') {
+                                message += `: ${errorData.detail}`;
+                            } else if (Array.isArray(errorData.detail)) {
+                                message += ': ' + errorData.detail.map(err => `${err.loc ? err.loc.join('.') + ': ' : ''}${err.msg}`).join('; ');
+                            } else if (typeof errorData.detail === 'object') {
+                                message += `: ${JSON.stringify(errorData.detail)}`;
+                            }
                         }
                         this.notificationService.show(message, 'error');
                     } catch (e) {
