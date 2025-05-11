@@ -4,19 +4,39 @@ import contextvars
 import contextlib
 import os
 import sys
-from typing import AsyncGenerator, Generator, Type, Dict, Any, Optional as TypingOptional, List as TypingList, Optional
+from typing import (
+    AsyncGenerator,
+    Generator,
+    Type,
+    Dict,
+    Any,
+    Optional as TypingOptional,
+    List as TypingList,
+    Optional,
+)
 from unittest import mock
 
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
+    async_sessionmaker,
+    AsyncEngine,
+)
+
 # StaticPool убран, будем использовать дефолтный пул для sqlite
 from sqlmodel import SQLModel, Field as SQLModelField, Field
 from pydantic import BaseModel as PydanticBaseModel, ConfigDict, HttpUrl
 
 from core_sdk.db import session as sdk_db_session_module
-from core_sdk.db.session import managed_session as sdk_managed_session, get_current_session, init_db as sdk_init_db_func, close_db as sdk_close_db_func
+from core_sdk.db.session import (
+    managed_session as sdk_managed_session,
+    get_current_session,
+    init_db as sdk_init_db_func,
+    close_db as sdk_close_db_func,
+)
 from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
 from core_sdk.data_access.base_manager import BaseDataAccessManager
 from core_sdk.data_access.manager_factory import DataAccessManagerFactory
@@ -29,6 +49,7 @@ import uuid
 
 logger = logging.getLogger("core_sdk.tests.conftest")
 
+
 # --- Вспомогательные классы (модели и схемы для тестов) ---
 # (Без изменений, оставляем как есть)
 class FactoryTestItem(SQLModel, table=True):
@@ -38,93 +59,125 @@ class FactoryTestItem(SQLModel, table=True):
     name: str = Field(index=True)
     description: Optional[str] = None
 
+
 class FactoryTestItemCreate(PydanticBaseModel):
     name: str
     description: Optional[str] = None
+
 
 class FactoryTestItemUpdate(PydanticBaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
+
 class FactoryTestItemRead(FactoryTestItem):
     pass
 
-class CustomLocalFactoryItemManager(BaseDataAccessManager[FactoryTestItem, FactoryTestItemCreate, FactoryTestItemUpdate]):
+
+class CustomLocalFactoryItemManager(
+    BaseDataAccessManager[FactoryTestItem, FactoryTestItemCreate, FactoryTestItemUpdate]
+):
     pass
+
 
 class AnotherFactoryItem(SQLModel, table=True):
     __tablename__ = "another_factory_items_sdk"
     id: Optional[int] = Field(default=None, primary_key=True)
     value: str
 
-class AnotherFactoryItemRead(AnotherFactoryItem): pass
+
+class AnotherFactoryItemRead(AnotherFactoryItem):
+    pass
+
 
 class Item(SQLModel, table=True):
     __tablename__ = "sdk_test_items_global_v2"
-    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    id: TypingOptional[uuid.UUID] = SQLModelField(
+        default_factory=uuid.uuid4, primary_key=True
+    )
     name: str = SQLModelField(index=True)
     description: TypingOptional[str] = SQLModelField(default=None)
     value: TypingOptional[int] = SQLModelField(default=None)
     lsn: TypingOptional[int] = SQLModelField(default=None, unique=True, index=True)
+
 
 class ItemCreate(PydanticBaseModel):
     name: str
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
     lsn: TypingOptional[int] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class ItemUpdate(PydanticBaseModel):
     name: TypingOptional[str] = None
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
-class ItemRead(Item): pass
+
+class ItemRead(Item):
+    pass
+
 
 class ItemFilter(DefaultFilter):
     name: TypingOptional[str] = None
     name__like: TypingOptional[str] = None
     value__gt: TypingOptional[int] = None
+
     class Constants(DefaultFilter.Constants):
         model = Item
         search_model_fields = ["name", "description"]
 
+
 class CrudFactoryItem(SQLModel, table=True):
     __tablename__ = "sdk_crud_factory_items_v2"
-    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    id: TypingOptional[uuid.UUID] = SQLModelField(
+        default_factory=uuid.uuid4, primary_key=True
+    )
     name: str
     description: TypingOptional[str] = SQLModelField(default=None)
     value: TypingOptional[int] = SQLModelField(default=None)
     lsn: TypingOptional[int] = SQLModelField(default=None, unique=True, index=True)
 
+
 class CrudFactoryItemCreate(PydanticBaseModel):
     name: str
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class CrudFactoryItemUpdate(PydanticBaseModel):
     name: TypingOptional[str] = None
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class CrudFactoryItemRead(CrudFactoryItemCreate):
     id: uuid.UUID
     pass
 
+
 class CrudFactoryItemFilter(DefaultFilter):
     name: TypingOptional[str] = None
+
     class Constants(DefaultFilter.Constants):
         model = CrudFactoryItem
 
+
 class CrudSimpleItem(SQLModel, table=True):
     __tablename__ = "sdk_crud_simple_items_v2"
-    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    id: TypingOptional[uuid.UUID] = SQLModelField(
+        default_factory=uuid.uuid4, primary_key=True
+    )
     name: str
 
-class CrudSimpleItemRead(CrudSimpleItem): pass
+
+class CrudSimpleItemRead(CrudSimpleItem):
+    pass
+
 
 class AppSetupTestSettings(BaseAppSettings):
     PROJECT_NAME: str = "SDKTestAppSetupProject"
@@ -136,21 +189,28 @@ class AppSetupTestSettings(BaseAppSettings):
     DB_MAX_OVERFLOW: int = 1
     LOGGING_LEVEL: str = "DEBUG"
     BACKEND_CORS_ORIGINS: TypingList[str] = ["http://test-origin.com"]
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra="ignore")
+
 
 # --- Глобальные фикстуры для управления состоянием SDK ---
+
 
 @pytest.fixture(scope="session", autouse=True)
 def set_sdk_test_environment(request: pytest.FixtureRequest):
     logger.info("Setting ENV=test for SDK test session.")
     original_env_value = os.environ.get("ENV")
     os.environ["ENV"] = "test"
+
     def finalizer():
         logger.info("Restoring original ENV after SDK test session.")
         if original_env_value is None:
-            if "ENV" in os.environ: del os.environ["ENV"]
-        else: os.environ["ENV"] = original_env_value
+            if "ENV" in os.environ:
+                del os.environ["ENV"]
+        else:
+            os.environ["ENV"] = original_env_value
+
     request.addfinalizer(finalizer)
+
 
 # @pytest.fixture(scope="session")
 # def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
@@ -159,13 +219,14 @@ def set_sdk_test_environment(request: pytest.FixtureRequest):
 #     yield loop
 #     loop.close()
 
+
 @pytest_asyncio.fixture(scope="session")
-async def sdk_test_engine_instance(): # Переименовал для ясности
+async def sdk_test_engine_instance():  # Переименовал для ясности
     logger.info("Creating SDK test engine instance (session scope)...")
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:?cache=shared",
         connect_args={"check_same_thread": False},
-        echo=False
+        echo=False,
     )
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
@@ -174,16 +235,22 @@ async def sdk_test_engine_instance(): # Переименовал для ясно
     logger.info("Disposing SDK test engine instance (session scope)...")
     await engine.dispose()
 
+
 @pytest_asyncio.fixture(scope="session")
-async def sdk_test_session_maker_instance(sdk_test_engine_instance: AsyncEngine) -> async_sessionmaker[AsyncSession]: # Переименовал
+async def sdk_test_session_maker_instance(
+    sdk_test_engine_instance: AsyncEngine,
+) -> async_sessionmaker[AsyncSession]:  # Переименовал
     logger.debug("Creating SDK test session_maker instance (session scope)...")
-    return async_sessionmaker(bind=sdk_test_engine_instance, class_=AsyncSession, expire_on_commit=False)
+    return async_sessionmaker(
+        bind=sdk_test_engine_instance, class_=AsyncSession, expire_on_commit=False
+    )
+
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def auto_init_sdk_db_for_tests(
-        sdk_test_engine_instance: AsyncEngine,
-        sdk_test_session_maker_instance: async_sessionmaker[AsyncSession],
-        monkeypatch: pytest.MonkeyPatch
+    sdk_test_engine_instance: AsyncEngine,
+    sdk_test_session_maker_instance: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ):
     """
     Автоматически инициализирует глобальные _db_engine и _db_session_maker
@@ -193,14 +260,18 @@ async def auto_init_sdk_db_for_tests(
     """
     logger.debug("auto_init_sdk_db_for_tests: Patching SDK's global DB variables.")
     monkeypatch.setattr(sdk_db_session_module, "_db_engine", sdk_test_engine_instance)
-    monkeypatch.setattr(sdk_db_session_module, "_db_session_maker", sdk_test_session_maker_instance)
+    monkeypatch.setattr(
+        sdk_db_session_module, "_db_session_maker", sdk_test_session_maker_instance
+    )
 
     # Также сбрасываем contextvar для чистоты перед тестом
     sdk_db_session_module._current_session.set(None)
 
-    yield # Тест выполняется здесь
+    yield  # Тест выполняется здесь
 
-    logger.debug("auto_init_sdk_db_for_tests: Cleaning up SDK's global DB variables after test.")
+    logger.debug(
+        "auto_init_sdk_db_for_tests: Cleaning up SDK's global DB variables after test."
+    )
     # monkeypatch автоматически отменит изменения, но для ясности можно и вручную
     # monkeypatch.undo() # или сбросить значения в None
     sdk_db_session_module._db_engine = None
@@ -211,54 +282,78 @@ async def auto_init_sdk_db_for_tests(
 @pytest.fixture(scope="function", autouse=True)
 def manage_model_registry_for_tests():
     # (Без изменений)
-    logger.debug("manage_model_registry_for_tests: Clearing ModelRegistry before test function.")
+    logger.debug(
+        "manage_model_registry_for_tests: Clearing ModelRegistry before test function."
+    )
     ModelRegistry.clear()
     ModelRegistry.register_local(
-        model_name="Item", model_cls=Item, create_schema_cls=ItemCreate,
-        update_schema_cls=ItemUpdate, read_schema_cls=ItemRead, filter_cls=ItemFilter
+        model_name="Item",
+        model_cls=Item,
+        create_schema_cls=ItemCreate,
+        update_schema_cls=ItemUpdate,
+        read_schema_cls=ItemRead,
+        filter_cls=ItemFilter,
     )
     ModelRegistry.register_local(
-        model_name="CrudFactoryItem", model_cls=CrudFactoryItem,
-        create_schema_cls=CrudFactoryItemCreate, update_schema_cls=CrudFactoryItemUpdate,
-        read_schema_cls=CrudFactoryItemRead, filter_cls=CrudFactoryItemFilter
+        model_name="CrudFactoryItem",
+        model_cls=CrudFactoryItem,
+        create_schema_cls=CrudFactoryItemCreate,
+        update_schema_cls=CrudFactoryItemUpdate,
+        read_schema_cls=CrudFactoryItemRead,
+        filter_cls=CrudFactoryItemFilter,
     )
     ModelRegistry.register_local(
-        model_name="CrudSimpleItem", model_cls=CrudSimpleItem,
-        read_schema_cls=CrudSimpleItemRead
+        model_name="CrudSimpleItem",
+        model_cls=CrudSimpleItem,
+        read_schema_cls=CrudSimpleItemRead,
     )
     ModelRegistry.register_local(
-        model_name="FactoryLocalItem", model_cls=FactoryTestItem,
+        model_name="FactoryLocalItem",
+        model_cls=FactoryTestItem,
         manager_cls=CustomLocalFactoryItemManager,
-        create_schema_cls=FactoryTestItemCreate, update_schema_cls=FactoryTestItemUpdate,
-        read_schema_cls=FactoryTestItemRead
+        create_schema_cls=FactoryTestItemCreate,
+        update_schema_cls=FactoryTestItemUpdate,
+        read_schema_cls=FactoryTestItemRead,
     )
     ModelRegistry.register_local(
-        model_name="FactoryLocalItemWithBaseDam", model_cls=AnotherFactoryItem,
-        read_schema_cls=AnotherFactoryItemRead
+        model_name="FactoryLocalItemWithBaseDam",
+        model_cls=AnotherFactoryItem,
+        read_schema_cls=AnotherFactoryItemRead,
     )
     ModelRegistry.register_remote(
-        model_name="FactoryRemoteItem", model_cls=FactoryTestItemRead,
-        config=RemoteConfig(service_url=HttpUrl("http://remote-factory-service.com"), model_endpoint="/api/v1/factoryremoteitems"),
-        create_schema_cls=FactoryTestItemCreate, update_schema_cls=FactoryTestItemUpdate,
-        read_schema_cls=FactoryTestItemRead
+        model_name="FactoryRemoteItem",
+        model_cls=FactoryTestItemRead,
+        config=RemoteConfig(
+            service_url=HttpUrl("http://remote-factory-service.com"),
+            model_endpoint="/api/v1/factoryremoteitems",
+        ),
+        create_schema_cls=FactoryTestItemCreate,
+        update_schema_cls=FactoryTestItemUpdate,
+        read_schema_cls=FactoryTestItemRead,
     )
     if not ModelRegistry.is_configured():
-        pytest.fail("manage_model_registry_for_tests: ModelRegistry failed to configure after setup.")
+        pytest.fail(
+            "manage_model_registry_for_tests: ModelRegistry failed to configure after setup."
+        )
     yield
-    logger.debug("manage_model_registry_for_tests: Clearing ModelRegistry after test function.")
+    logger.debug(
+        "manage_model_registry_for_tests: Clearing ModelRegistry after test function."
+    )
     ModelRegistry.clear()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def db_session(
-        sdk_test_session_maker_instance: async_sessionmaker[AsyncSession], # Используем переименованную фикстуру
-        auto_init_sdk_db_for_tests: Any, # Зависимость от авто-инициализации
-        manage_model_registry_for_tests: Any
+    sdk_test_session_maker_instance: async_sessionmaker[
+        AsyncSession
+    ],  # Используем переименованную фикстуру
+    auto_init_sdk_db_for_tests: Any,  # Зависимость от авто-инициализации
+    manage_model_registry_for_tests: Any,
 ) -> AsyncGenerator[AsyncSession, None]:
     logger.debug("db_session fixture: Creating new session and setting contextvar...")
     # auto_init_sdk_db_for_tests уже установил _db_session_maker в модуле SDK
     # поэтому managed_session должен работать корректно
-    async with sdk_managed_session() as session: # Используем managed_session из SDK
+    async with sdk_managed_session() as session:  # Используем managed_session из SDK
         logger.debug("db_session fixture: Clearing data from tables...")
         async with session.begin_nested():
             for table in reversed(SQLModel.metadata.sorted_tables):
@@ -274,7 +369,7 @@ async def db_session(
 
 @pytest.fixture(scope="function")
 def dam_factory(
-        manage_model_registry_for_tests: Any,
+    manage_model_registry_for_tests: Any,
 ) -> DataAccessManagerFactory:
     logger.debug("dam_factory fixture: Creating DataAccessManagerFactory instance.")
     return DataAccessManagerFactory(registry=ModelRegistry)
@@ -282,8 +377,7 @@ def dam_factory(
 
 @pytest.fixture(scope="function")
 def item_manager(
-        dam_factory: DataAccessManagerFactory,
-        db_session: AsyncSession
+    dam_factory: DataAccessManagerFactory, db_session: AsyncSession
 ) -> BaseDataAccessManager[Item, ItemCreate, ItemUpdate]:
     logger.debug("item_manager fixture: Getting 'Item' manager.")
     manager = dam_factory.get_manager("Item")
@@ -291,7 +385,10 @@ def item_manager(
 
 
 @pytest_asyncio.fixture
-async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession) -> TypingList[Item]:
+async def sample_items(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    db_session: AsyncSession,
+) -> TypingList[Item]:
     # (Без изменений)
     logger.debug("sample_items fixture: Creating sample items...")
     items_data_with_lsn = [
@@ -306,7 +403,9 @@ async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, Ite
         item_create_data = ItemCreate(**data)
         created_item = await item_manager.create(item_create_data)
         if created_item.lsn is None and data.get("lsn") is not None:
-            logger.warning(f"LSN for {data['name']} is None, setting manually to {data['lsn']}.")
+            logger.warning(
+                f"LSN for {data['name']} is None, setting manually to {data['lsn']}."
+            )
             created_item.lsn = data["lsn"]
             item_manager.session.add(created_item)
             await item_manager.session.commit()
@@ -320,6 +419,7 @@ async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, Ite
 def app_setup_settings() -> AppSetupTestSettings:
     return AppSetupTestSettings()
 
+
 worker_settings = app_setup_settings
 
 
@@ -331,30 +431,52 @@ def mock_broker():
     broker.shutdown = mock.AsyncMock(name="broker_shutdown")
     return broker
 
+
 @pytest.fixture
-def mock_before_startup(): return mock.AsyncMock(name="mock_before_startup")
+def mock_before_startup():
+    return mock.AsyncMock(name="mock_before_startup")
+
+
 @pytest.fixture
-def mock_after_startup(): return mock.AsyncMock(name="mock_after_startup")
+def mock_after_startup():
+    return mock.AsyncMock(name="mock_after_startup")
+
+
 @pytest.fixture
-def mock_before_shutdown(): return mock.AsyncMock(name="mock_before_shutdown")
+def mock_before_shutdown():
+    return mock.AsyncMock(name="mock_before_shutdown")
+
+
 @pytest.fixture
-def mock_after_shutdown(): return mock.AsyncMock(name="mock_after_shutdown")
+def mock_after_shutdown():
+    return mock.AsyncMock(name="mock_after_shutdown")
+
 
 # Эти моки теперь не нужны глобально, если auto_init_sdk_db_for_tests работает
 @pytest.fixture
-def mock_sdk_init_db(): return mock.Mock(name="mock_sdk_init_db_app_setup")
+def mock_sdk_init_db():
+    return mock.Mock(name="mock_sdk_init_db_app_setup")
+
+
 @pytest.fixture
-def mock_sdk_close_db(): return mock.AsyncMock(name="mock_sdk_close_db_app_setup")
+def mock_sdk_close_db():
+    return mock.AsyncMock(name="mock_sdk_close_db_app_setup")
+
+
 @pytest.fixture
-def mock_model_registry_rebuild(): return mock.Mock(name="mock_mr_rebuild_app_setup")
+def mock_model_registry_rebuild():
+    return mock.Mock(name="mock_mr_rebuild_app_setup")
+
 
 @pytest.fixture
 def mock_app_http_client_lifespan_cm():
     @contextlib.asynccontextmanager
     async def _cm(app):
         logger.debug("Mock app_http_client_lifespan entered.")
-        original_client = getattr(app.state, 'http_client', None)
-        app.state.http_client = mock.AsyncMock(spec=httpx.AsyncClient, name="mock_http_client_in_lifespan")
+        original_client = getattr(app.state, "http_client", None)
+        app.state.http_client = mock.AsyncMock(
+            spec=httpx.AsyncClient, name="mock_http_client_in_lifespan"
+        )
         app.state.http_client_mocked = True
         try:
             yield
@@ -362,4 +484,5 @@ def mock_app_http_client_lifespan_cm():
             logger.debug("Mock app_http_client_lifespan exiting.")
             app.state.http_client = original_client
             app.state.http_client_mocked = False
+
     return _cm

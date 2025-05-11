@@ -1,6 +1,6 @@
 # hash_my_password.py
 import sys
-from getpass import getpass # Для безопасного ввода пароля
+from getpass import getpass  # Для безопасного ввода пароля
 
 # --- Убедитесь, что SDK доступен ---
 # Добавляем корень проекта в PYTHONPATH, если скрипт запускается из корня

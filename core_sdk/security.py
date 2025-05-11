@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 # Используем bcrypt как рекомендуемый алгоритм
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Проверяет, соответствует ли обычный пароль хешированному.
@@ -36,6 +37,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         logger.exception(f"Unexpected error verifying password: {e}")
         return False
 
+
 def get_password_hash(password: str) -> str:
     """
     Возвращает хеш для заданного пароля.
@@ -56,15 +58,17 @@ def get_password_hash(password: str) -> str:
         # Перевыбрасываем, т.к. не можем вернуть валидный хеш
         raise RuntimeError("Failed to hash password") from e
 
+
 # --- JWT Token Handling ---
-ALGORITHM = "HS256" # Алгоритм подписи по умолчанию
+ALGORITHM = "HS256"  # Алгоритм подписи по умолчанию
+
 
 def create_access_token(
     *,
     data: Dict[str, Any],
     secret_key: str,
     algorithm: str = ALGORITHM,
-    expires_delta: timedelta
+    expires_delta: timedelta,
 ) -> str:
     """
     Создает JWT access токен.
@@ -82,7 +86,7 @@ def create_access_token(
         raise ValueError("Secret key must be provided to create access token.")
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire, "type": "access"}) # Добавляем срок годности и тип
+    to_encode.update({"exp": expire, "type": "access"})  # Добавляем срок годности и тип
     try:
         encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=algorithm)
         return encoded_jwt
@@ -93,10 +97,10 @@ def create_access_token(
 
 def create_refresh_token(
     *,
-    data: Dict[str, Any], # Обычно содержит только user_id или аналог
+    data: Dict[str, Any],  # Обычно содержит только user_id или аналог
     secret_key: str,
     algorithm: str = ALGORITHM,
-    expires_delta: timedelta # Обычно дольше, чем у access токена
+    expires_delta: timedelta,  # Обычно дольше, чем у access токена
 ) -> str:
     """
     Создает JWT refresh токен.
@@ -114,13 +118,16 @@ def create_refresh_token(
         raise ValueError("Secret key must be provided to create refresh token.")
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire, "type": "refresh"}) # Добавляем срок годности и тип
+    to_encode.update(
+        {"exp": expire, "type": "refresh"}
+    )  # Добавляем срок годности и тип
     try:
         encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=algorithm)
         return encoded_jwt
     except Exception as e:
         logger.exception("Error encoding refresh token.")
         raise RuntimeError("Failed to create refresh token") from e
+
 
 def verify_token(
     token: str,
@@ -129,7 +136,7 @@ def verify_token(
     # Используем стандартное исключение Python по умолчанию,
     # чтобы SDK не зависел от FastAPI напрямую.
     # Вызывающий код (например, зависимость FastAPI) может передать HTTPException.
-    credentials_exception: Exception = ValueError("Could not validate credentials")
+    credentials_exception: Exception = ValueError("Could not validate credentials"),
 ) -> Dict[str, Any]:
     """
     Декодирует и валидирует JWT токен.
@@ -147,22 +154,24 @@ def verify_token(
         # Это критическая ошибка конфигурации
         raise ValueError("Secret key must be provided to verify token.")
     if not token:
-         logger.warning("Token verification attempt with empty token string.")
-         raise credentials_exception # Пустой токен невалиден
+        logger.warning("Token verification attempt with empty token string.")
+        raise credentials_exception  # Пустой токен невалиден
 
     try:
         payload = jwt.decode(
             token,
             secret_key,
-            algorithms=[algorithm]
+            algorithms=[algorithm],
             # Опции можно добавить, например, для проверки audience ('aud')
             # options={"verify_aud": False}
         )
         # Проверяем наличие обязательного поля 'user_id'
         user_id = payload.get("user_id")
         if user_id is None:
-             logger.warning("Token verification failed: 'user_id' claim missing in payload.")
-             raise credentials_exception # Отсутствие user_id - невалидный токен для системы
+            logger.warning(
+                "Token verification failed: 'user_id' claim missing in payload."
+            )
+            raise credentials_exception  # Отсутствие user_id - невалидный токен для системы
 
         # Можно добавить другие обязательные проверки payload здесь
 

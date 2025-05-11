@@ -3,10 +3,10 @@ import pytest
 import uuid
 from typing import List, Optional, Dict, Any
 
-import pytest_asyncio # Убедимся, что импортирован для @pytest_asyncio.fixture
+import pytest_asyncio  # Убедимся, что импортирован для @pytest_asyncio.fixture
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field as PydanticField, ValidationError
-from starlette.exceptions import HTTPException # Используем из starlette
+from starlette.exceptions import HTTPException  # Используем из starlette
 
 from core_sdk.data_access.base_manager import BaseDataAccessManager
 # Убираем импорты DataAccessManagerFactory и ModelRegistry, если они не используются напрямую в этом файле
@@ -15,7 +15,7 @@ from core_sdk.data_access.base_manager import BaseDataAccessManager
 
 # Импортируем тестовые модели/схемы из общего conftest SDK
 from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead, ItemFilter
-import logging # Добавим логгирование для тестов
+import logging  # Добавим логгирование для тестов
 
 from data_access import DataAccessManagerFactory
 from registry import ModelRegistry
@@ -25,14 +25,22 @@ test_logger = logging.getLogger("core_sdk.tests.test_base_manager")
 pytestmark = pytest.mark.asyncio
 # --- Тесты для CREATE ---
 
+
 @pytest.fixture(autouse=True)
-def manage_registry_for_crud_tests(manage_model_registry_for_tests: Any): # Зависим от общей фикстуры
+def manage_registry_for_crud_tests(
+    manage_model_registry_for_tests: Any,
+):  # Зависим от общей фикстуры
     """Эта фикстура просто существует, чтобы показать зависимость от общей настройки реестра."""
     pass
 
-async def test_create_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session): # <--- ДОБАВЛЕНА db_session
+
+async def test_create_item_success(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session
+):  # <--- ДОБАВЛЕНА db_session
     test_logger.info("--- test_create_item_success START ---")
-    item_data = ItemCreate(name="Test Item 1", description="Description 1", value=100, lsn=1)
+    item_data = ItemCreate(
+        name="Test Item 1", description="Description 1", value=100, lsn=1
+    )
     created_item = await item_manager.create(item_data)
 
     assert created_item is not None
@@ -40,30 +48,44 @@ async def test_create_item_success(item_manager: BaseDataAccessManager[Item, Ite
     assert created_item.name == item_data.name
     assert created_item.description == item_data.description
     assert created_item.value == item_data.value
-    assert created_item.lsn == item_data.lsn # Проверяем установленный LSN
+    assert created_item.lsn == item_data.lsn  # Проверяем установленный LSN
 
-    fetched_item = await db_session.get(Item, created_item.id) # Используем db_session для проверки
+    fetched_item = await db_session.get(
+        Item, created_item.id
+    )  # Используем db_session для проверки
     assert fetched_item is not None
     assert fetched_item.name == item_data.name
     test_logger.info("--- test_create_item_success END ---")
 
-async def test_create_item_with_dict(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession):
+
+async def test_create_item_with_dict(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    db_session: AsyncSession,
+):
     item_data_dict = {"name": "Test Item Dict", "value": 200}
-    created_item = await item_manager.create(item_data_dict) # Передаем dict
+    created_item = await item_manager.create(item_data_dict)  # Передаем dict
 
     assert created_item is not None
     assert created_item.name == item_data_dict["name"]
     assert created_item.value == item_data_dict["value"]
 
-async def test_create_item_validation_error(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+
+async def test_create_item_validation_error(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     # ItemCreate требует name, передаем невалидные данные (без name)
     invalid_data = {"description": "Only description"}
-    with pytest.raises(HTTPException) as exc_info: # Ожидаем HTTPException от Pydantic ValidationError
-        await item_manager.create(invalid_data) # type: ignore
+    with pytest.raises(
+        HTTPException
+    ) as exc_info:  # Ожидаем HTTPException от Pydantic ValidationError
+        await item_manager.create(invalid_data)  # type: ignore
     assert exc_info.value.status_code == 422
 
+
 # --- Тесты для GET ---
-async def test_get_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session):
+async def test_get_item_success(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session
+):
     item_data = ItemCreate(name="Get Item")
     created_item = await item_manager.create(item_data)
 
@@ -72,16 +94,22 @@ async def test_get_item_success(item_manager: BaseDataAccessManager[Item, ItemCr
     assert fetched_item.id == created_item.id
     assert fetched_item.name == "Get Item"
 
-async def test_get_item_not_found(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+
+async def test_get_item_not_found(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     # Используем фиктивный ID, которого нет в БД
     # В SQLite ID обычно int, но для общего случая можно использовать UUID, если модель его поддерживает
     # Наша тестовая модель Item использует int ID.
     non_existent_id = uuid.uuid4()
-    fetched_item = await item_manager.get(non_existent_id) # type: ignore
+    fetched_item = await item_manager.get(non_existent_id)  # type: ignore
     assert fetched_item is None
 
+
 # --- Тесты для UPDATE ---
-async def test_update_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+async def test_update_item_success(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     created_item = await item_manager.create(ItemCreate(name="Original Name", value=10))
 
     update_data = ItemUpdate(name="Updated Name", value=20)
@@ -91,35 +119,52 @@ async def test_update_item_success(item_manager: BaseDataAccessManager[Item, Ite
     assert updated_item.id == created_item.id
     assert updated_item.name == "Updated Name"
     assert updated_item.value == 20
-    assert updated_item.description == created_item.description # Не меняли
+    assert updated_item.description == created_item.description  # Не меняли
 
-async def test_update_item_with_dict(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+
+async def test_update_item_with_dict(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     created_item = await item_manager.create(ItemCreate(name="Dict Update Original"))
     update_data_dict = {"description": "Updated via Dict"}
-    updated_item = await item_manager.update(created_item.id, update_data_dict) # Передаем dict
+    updated_item = await item_manager.update(
+        created_item.id, update_data_dict
+    )  # Передаем dict
 
     assert updated_item.description == "Updated via Dict"
-    assert updated_item.name == "Dict Update Original" # Не меняли
+    assert updated_item.name == "Dict Update Original"  # Не меняли
 
-async def test_update_item_not_found(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+
+async def test_update_item_not_found(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     non_existent_id = uuid.uuid4()
     update_data = ItemUpdate(name="Won't Update")
     with pytest.raises(HTTPException) as exc_info:
-        await item_manager.update(non_existent_id, update_data) # type: ignore
+        await item_manager.update(non_existent_id, update_data)  # type: ignore
     assert exc_info.value.status_code == 404
 
-async def test_update_item_partial_update(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
-    created_item = await item_manager.create(ItemCreate(name="Partial Original", description="Desc", value=50))
+
+async def test_update_item_partial_update(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
+    created_item = await item_manager.create(
+        ItemCreate(name="Partial Original", description="Desc", value=50)
+    )
     # ItemUpdate все поля Optional, так что это частичное обновление
     update_data = ItemUpdate(value=55)
     updated_item = await item_manager.update(created_item.id, update_data)
 
-    assert updated_item.name == "Partial Original" # Должно остаться
-    assert updated_item.description == "Desc"     # Должно остаться
-    assert updated_item.value == 55               # Должно измениться
+    assert updated_item.name == "Partial Original"  # Должно остаться
+    assert updated_item.description == "Desc"  # Должно остаться
+    assert updated_item.value == 55  # Должно измениться
+
 
 # --- Тесты для DELETE ---
-async def test_delete_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession):
+async def test_delete_item_success(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    db_session: AsyncSession,
+):
     created_item = await item_manager.create(ItemCreate(name="To Be Deleted"))
     item_id = created_item.id
 
@@ -130,15 +175,21 @@ async def test_delete_item_success(item_manager: BaseDataAccessManager[Item, Ite
     deleted_item_from_db = await db_session.get(Item, item_id)
     assert deleted_item_from_db is None
 
-async def test_delete_item_not_found(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+
+async def test_delete_item_not_found(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+):
     non_existent_id = uuid.uuid4()
     with pytest.raises(HTTPException) as exc_info:
-        await item_manager.delete(non_existent_id) # type: ignore
+        await item_manager.delete(non_existent_id)  # type: ignore
     assert exc_info.value.status_code == 404
+
 
 # --- Тесты для LIST (пагинация и фильтрация) ---
 @pytest_asyncio.fixture(scope="function")
-async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session) -> List[Item]:
+async def sample_items(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session
+) -> List[Item]:
     """Создает несколько тестовых элементов для пагинации и фильтрации."""
     items_data = [
         ItemCreate(name="Apple", description="Red fruit", value=10, lsn=1),
@@ -154,18 +205,24 @@ async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, Ite
         created.append(await item_manager.create(data))
     return created
 
-async def test_list_items_default_pagination(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
-    result = await item_manager.list(limit=3) # Запрашиваем первые 3
+
+async def test_list_items_default_pagination(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
+    result = await item_manager.list(limit=3)  # Запрашиваем первые 3
     assert len(result["items"]) == 3
     assert result["count"] == 3
     assert result["items"][0].name == "Apple"
     assert result["items"][1].name == "Banana"
     assert result["items"][2].name == "Cherry"
-    assert result["next_cursor"] == result["items"][2].lsn # Курсор на последний элемент
+    assert (
+        result["next_cursor"] == result["items"][2].lsn
+    )  # Курсор на последний элемент
 
     # Запрашиваем следующую страницу
     result_page2 = await item_manager.list(cursor=3, limit=3)
-    assert len(result_page2["items"]) == 2 # Осталось 2 элемента
+    assert len(result_page2["items"]) == 2  # Осталось 2 элемента
     assert result_page2["count"] == 2
     assert result_page2["items"][0].name == "Date"
     assert result_page2["items"][1].name == "Elderberry"
@@ -175,61 +232,93 @@ async def test_list_items_default_pagination(item_manager: BaseDataAccessManager
     result_page3 = await item_manager.list(cursor=result_page2["next_cursor"], limit=3)
     assert len(result_page3["items"]) == 0
     assert result_page3["count"] == 0
-    assert result_page3["next_cursor"] == result_page2["next_cursor"] # Курсор не должен измениться
+    assert (
+        result_page3["next_cursor"] == result_page2["next_cursor"]
+    )  # Курсор не должен измениться
 
-async def test_list_items_desc_pagination(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_desc_pagination(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Сначала получаем последнюю страницу в DESC (самые новые)
     # Так как cursor=None, он возьмет самые "большие" LSN
     result_desc1 = await item_manager.list(limit=3, direction="desc")
     assert len(result_desc1["items"]) == 3
-    assert result_desc1["items"][0].name == "Elderberry" # Самый новый (наибольший LSN)
+    assert result_desc1["items"][0].name == "Elderberry"  # Самый новый (наибольший LSN)
     assert result_desc1["items"][1].name == "Date"
     assert result_desc1["items"][2].name == "Cherry"
     # next_cursor в DESC указывает на LSN первого элемента в текущем наборе (самого нового из этой пачки)
     assert result_desc1["next_cursor"] == result_desc1["items"][-1].lsn
 
     # Запрашиваем "предыдущую" страницу в DESC (элементы с меньшим LSN)
-    result_desc2 = await item_manager.list(cursor=result_desc1["next_cursor"], limit=3, direction="desc")
+    result_desc2 = await item_manager.list(
+        cursor=result_desc1["next_cursor"], limit=3, direction="desc"
+    )
     assert len(result_desc2["items"]) == 2
     assert result_desc2["items"][0].name == "Banana"
     assert result_desc2["items"][1].name == "Apple"
     assert result_desc2["next_cursor"] == result_desc2["items"][-1].lsn
 
-async def test_list_items_filter_exact_name(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_filter_exact_name(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Используем словарь для фильтров
     filters_dict = {"name": "Banana"}
     result = await item_manager.list(filters=filters_dict)
     assert len(result["items"]) == 1
     assert result["items"][0].name == "Banana"
 
-async def test_list_items_filter_name_like(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_filter_name_like(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Используем объект фильтра
-    filter_obj = ItemFilter(name__like="berry") # Elderberry
+    filter_obj = ItemFilter(name__like="berry")  # Elderberry
     result = await item_manager.list(filters=filter_obj)
     assert len(result["items"]) == 1
     assert result["items"][0].name == "Elderberry"
 
-async def test_list_items_filter_value_gt(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_filter_value_gt(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Banana (20), Date (20), Elderberry (25)
     filter_obj = ItemFilter(value__gt=15)
-    result = await item_manager.list(filters=filter_obj, limit=10) # Увеличим лимит, чтобы все вошли
+    result = await item_manager.list(
+        filters=filter_obj, limit=10
+    )  # Увеличим лимит, чтобы все вошли
     assert len(result["items"]) == 3
     names = {item.name for item in result["items"]}
     assert "Banana" in names
     assert "Date" in names
     assert "Elderberry" in names
 
-async def test_list_items_search_filter(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_search_filter(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Ищем "fruit" в name или description
     # Apple, Banana, Cherry, Date
     filter_obj = ItemFilter(search="fruit")
     result = await item_manager.list(filters=filter_obj, limit=10)
     assert len(result["items"]) == 4
     names = {item.name for item in result["items"]}
-    assert "Apple" in names and "Banana" in names and "Cherry" in names and "Date" in names
-    assert "Elderberry" not in names # "Dark berry"
+    assert (
+        "Apple" in names and "Banana" in names and "Cherry" in names and "Date" in names
+    )
+    assert "Elderberry" not in names  # "Dark berry"
 
-async def test_list_items_combined_filters(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_combined_filters(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Ищем "Red" и value > 10
     # Apple (value=10, desc="Red fruit") - не подойдет, т.к. value не > 10
     # Cherry (value=15, desc="Red small fruit") - подойдет
@@ -238,17 +327,24 @@ async def test_list_items_combined_filters(item_manager: BaseDataAccessManager[I
     assert len(result["items"]) == 1
     assert result["items"][0].name == "Cherry"
 
-async def test_list_items_filter_with_registered_filter_class(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
+
+async def test_list_items_filter_with_registered_filter_class(
+    item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate],
+    sample_items: List[Item],
+):
     # Проверяем, что менеджер использует ItemFilter, зарегистрированный в ModelRegistry
     # Этот тест косвенно проверяет _get_filter_class()
-    filter_instance = ItemFilter(name="Apple") # Создаем экземпляр зарегистрированного фильтра
+    filter_instance = ItemFilter(
+        name="Apple"
+    )  # Создаем экземпляр зарегистрированного фильтра
     result = await item_manager.list(filters=filter_instance)
     assert len(result["items"]) == 1
     assert result["items"][0].name == "Apple"
 
+
 # --- Тесты для хуков (пример) ---
 class CustomItemManager(BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
-    model = Item # Нужно явно указать для _get_filter_class
+    model = Item  # Нужно явно указать для _get_filter_class
     create_schema = ItemCreate
     update_schema = ItemUpdate
 
@@ -263,7 +359,9 @@ class CustomItemManager(BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
             validated_data.description = "Set by create hook"
         return await super()._prepare_for_create(validated_data)
 
-    async def _prepare_for_update(self, db_item: Item, update_payload: Dict[str, Any]) -> tuple[Item, bool]:
+    async def _prepare_for_update(
+        self, db_item: Item, update_payload: Dict[str, Any]
+    ) -> tuple[Item, bool]:
         self.__class__._update_hook_called = True
         if update_payload.get("name") == "Hook Test Update":
             update_payload["description"] = "Set by update hook"
@@ -276,8 +374,11 @@ class CustomItemManager(BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
             raise HTTPException(status_code=403, detail="Deletion prevented by hook")
         await super()._prepare_for_delete(db_item)
 
+
 @pytest.fixture
-def custom_item_manager(db_session) -> CustomItemManager: # Зависит от db_session_management для ModelRegistry
+def custom_item_manager(
+    db_session,
+) -> CustomItemManager:  # Зависит от db_session_management для ModelRegistry
     # Регистрируем CustomItemManager для модели "Item" на время этого теста
     # Важно, чтобы ModelRegistry был очищен/восстановлен после теста
     # Фикстура db_session_management уже это делает.
@@ -286,12 +387,12 @@ def custom_item_manager(db_session) -> CustomItemManager: # Зависит от 
     # ModelRegistry.clear()
     ModelRegistry.register_local(
         model_cls=Item,
-        manager_cls=CustomItemManager, # Используем наш кастомный менеджер
+        manager_cls=CustomItemManager,  # Используем наш кастомный менеджер
         create_schema_cls=ItemCreate,
         update_schema_cls=ItemUpdate,
         read_schema_cls=ItemRead,
         filter_cls=ItemFilter,
-        model_name="ItemForHookTests" # Используем другое имя, чтобы не конфликтовать с "Item"
+        model_name="ItemForHookTests",  # Используем другое имя, чтобы не конфликтовать с "Item"
     )
     factory = DataAccessManagerFactory(registry=ModelRegistry)
     manager = factory.get_manager("ItemForHookTests")
@@ -299,13 +400,15 @@ def custom_item_manager(db_session) -> CustomItemManager: # Зависит от 
     CustomItemManager._create_hook_called = False
     CustomItemManager._update_hook_called = False
     CustomItemManager._delete_hook_called = False
-    return manager # type: ignore
+    return manager  # type: ignore
+
 
 async def test_create_hook(custom_item_manager: CustomItemManager):
     item_data = ItemCreate(name="Hook Test Create")
     created_item = await custom_item_manager.create(item_data)
     assert CustomItemManager._create_hook_called is True
     assert created_item.description == "Set by create hook"
+
 
 async def test_update_hook(custom_item_manager: CustomItemManager):
     item = await custom_item_manager.create(ItemCreate(name="Item for Update Hook"))
@@ -314,15 +417,17 @@ async def test_update_hook(custom_item_manager: CustomItemManager):
     assert CustomItemManager._update_hook_called is True
     assert updated_item.description == "Set by update hook"
 
+
 async def test_delete_hook_success(custom_item_manager: CustomItemManager):
     item = await custom_item_manager.create(ItemCreate(name="Item for Delete Hook"))
     await custom_item_manager.delete(item.id)
     assert CustomItemManager._delete_hook_called is True
 
+
 async def test_delete_hook_prevent(custom_item_manager: CustomItemManager):
     item = await custom_item_manager.create(ItemCreate(name="Prevent Delete Hook"))
     with pytest.raises(HTTPException) as exc_info:
         await custom_item_manager.delete(item.id)
-    assert CustomItemManager._delete_hook_called is True # Хук вызвался
+    assert CustomItemManager._delete_hook_called is True  # Хук вызвался
     assert exc_info.value.status_code == 403
     assert "Deletion prevented by hook" in exc_info.value.detail

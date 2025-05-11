@@ -1,7 +1,7 @@
 # core_sdk/broker/setup.py
 import os
 import logging
-from typing import Any # Для type hinting брокера
+from typing import Any  # Для type hinting брокера
 
 from taskiq import InMemoryBroker
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
@@ -19,7 +19,7 @@ IS_TEST_MODE_ENV = os.environ.get("ENV", "false").lower() == "test"
 # ---------------------------------------------------------
 
 # Переменная для хранения сконфигурированного брокера
-broker: Any # Используем Any, т.к. тип будет разным в зависимости от режима
+broker: Any  # Используем Any, т.к. тип будет разным в зависимости от режима
 
 # --- Инициализация InMemoryBroker для возможного использования ---
 logger.info("Initializing InMemoryBroker as a potential broker.")
@@ -44,7 +44,7 @@ try:
     # 2. Создаем базовый Redis брокер
     logger.debug("Initializing RedisStreamBroker...")
     base_broker = RedisStreamBroker(
-        url=REDIS_URL, # URL для подключения к Redis
+        url=REDIS_URL,  # URL для подключения к Redis
         # stream_name="taskiq_stream", # Имя стрима в Redis (опционально, по умолчанию 'taskiq')
         # group_name="taskiq_group",   # Имя группы консьюмеров (опционально, по умолчанию 'workers')
     )
@@ -67,14 +67,16 @@ except Exception as e:
 # Если ENV=prod, используется redis_broker_instance (если он успешно создан).
 # В противном случае (включая ENV=test, ENV=dev, или если ENV не задана,
 # или если redis_broker_instance не был создан из-за ошибки) используется in_memory_broker.
-current_env = os.getenv('ENV')
-if current_env == 'prod':
+current_env = os.getenv("ENV")
+if current_env == "prod":
     if redis_broker_instance:
         broker = redis_broker_instance
         logger.info("Using Redis Broker for 'prod' environment.")
     else:
-        logger.error("Requested 'prod' environment, but Redis Broker failed to initialize. Falling back to InMemoryBroker. THIS IS LIKELY A MISCONFIGURATION FOR PRODUCTION.")
-        broker = in_memory_broker # Нежелательный fallback для продакшена
+        logger.error(
+            "Requested 'prod' environment, but Redis Broker failed to initialize. Falling back to InMemoryBroker. THIS IS LIKELY A MISCONFIGURATION FOR PRODUCTION."
+        )
+        broker = in_memory_broker  # Нежелательный fallback для продакшена
 else:
     broker = in_memory_broker
     if IS_TEST_MODE_ENV:

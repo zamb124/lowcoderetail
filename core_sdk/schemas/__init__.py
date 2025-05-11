@@ -4,8 +4,8 @@
 
 # Пример ре-экспорта модулей:
 from . import token
-from . import user # Если UserRead переехал в SDK
-from . import i18n # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
+from . import user  # Если UserRead переехал в SDK
+from . import i18n  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
 # from . import group # Если GroupRead переехал в SDK
 # from . import permission # Если PermissionRead переехал в SDK
 # from . import company # Если CompanyRead переехал в SDK

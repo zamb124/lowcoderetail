@@ -1,10 +1,12 @@
 # core_sdk/exceptions.py
 
+
 class CoreSDKError(Exception):
     """
     Базовый класс для всех пользовательских исключений, возникающих в core_sdk.
     Это позволяет ловить все ошибки SDK одним блоком except CoreSDKError, если нужно.
     """
+
     pass
 
 
@@ -13,6 +15,7 @@ class ConfigurationError(CoreSDKError):
     Исключение, возникающее при ошибках конфигурации SDK или связанных компонентов.
     Например, если ModelRegistry не настроен, или в нем не найдена модель.
     """
+
     def __init__(self, message: str):
         self.message = message
         super().__init__(self.message)
@@ -26,7 +29,10 @@ class ServiceCommunicationError(CoreSDKError):
     Исключение, возникающее при ошибках связи с удаленным сервисом через HTTP-клиент.
     Включает информацию об URL, статус-коде (если есть) и деталях ошибки.
     """
-    def __init__(self, message: str, status_code: int | None = None, url: str | None = None):
+
+    def __init__(
+        self, message: str, status_code: int | None = None, url: str | None = None
+    ):
         """
         Инициализирует исключение ошибки связи.
 
@@ -57,9 +63,11 @@ class DetailException(Exception):
     для передачи конкретного сообщения об ошибке в HTTPException(400).
     Полезно, если стандартных сообщений Pydantic недостаточно.
     """
+
     def __init__(self, detail: str):
         self.detail = detail
         super().__init__(detail)
+
 
 # Можно добавить другие специфичные исключения SDK по мере необходимости,
 # например, AuthenticationError, AuthorizationError и т.д., наследуя их от CoreSDKError.
@@ -67,6 +75,7 @@ class DetailException(Exception):
 # class AuthenticationError(CoreSDKError):
 #     """Ошибка аутентификации."""
 #     pass
+
 
 # class AuthorizationError(CoreSDKError):
 #     """Ошибка авторизации (недостаточно прав)."""

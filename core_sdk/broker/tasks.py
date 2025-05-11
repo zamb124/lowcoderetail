@@ -5,12 +5,12 @@ from uuid import UUID
 
 
 # --- SDK Импорты ---
-from core_sdk.db.session import managed_session # Контекстный менеджер для сессий БД
+from core_sdk.db.session import managed_session  # Контекстный менеджер для сессий БД
 from core_sdk.registry import ModelRegistry
 from core_sdk.exceptions import CoreSDKError, ConfigurationError
 
 # Импортируем настроенный брокер из setup.py
-from .setup import broker # Объект брокера (InMemoryBroker или RedisStreamBroker)
+from .setup import broker  # Объект брокера (InMemoryBroker или RedisStreamBroker)
 # --------------------
 
 # --- Type Hinting ---
@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 # Получаем логгер для этого модуля
 logger = logging.getLogger("core_sdk.broker.tasks")
 
+
 # --- Вспомогательная функция для десериализации аргументов ---
 def _deserialize_arg(arg: Any) -> Any:
     """
@@ -30,7 +31,7 @@ def _deserialize_arg(arg: Any) -> Any:
     if isinstance(arg, str):
         try:
             # Простая проверка на формат UUID
-            if len(arg) == 36 and arg.count('-') == 4:
+            if len(arg) == 36 and arg.count("-") == 4:
                 return UUID(arg)
         except ValueError:
             # Если не удалось преобразовать в UUID, оставляем как есть (строку)
@@ -42,6 +43,7 @@ def _deserialize_arg(arg: Any) -> Any:
         # метод DAM сам его создаст из словаря.
         return {key: _deserialize_arg(value) for key, value in arg.items()}
     return arg
+
 
 # --- Вспомогательная функция для сериализации результата ---
 def _serialize_arg(arg: Any) -> Any:
@@ -56,7 +58,7 @@ def _serialize_arg(arg: Any) -> Any:
 
     if isinstance(arg, BaseModel):
         # Сериализуем Pydantic/SQLModel модели
-        return arg.model_dump(mode='json')
+        return arg.model_dump(mode="json")
     elif isinstance(arg, UUID):
         # Преобразуем UUID в строку
         return str(arg)
@@ -68,7 +70,10 @@ def _serialize_arg(arg: Any) -> Any:
         return {key: _serialize_arg(value) for key, value in arg.items()}
     # Простые типы (int, str, float, bool, None) возвращаются как есть
     return arg
+
+
 # -----------------------------------------------------------
+
 
 # --- Основная задача Taskiq ---
 @broker.task(task_name="execute_dam_operation")
@@ -113,12 +118,16 @@ async def execute_dam_operation(
     # будет правильно открыта, и закрыта (с rollback в случае ошибки) после выполнения.
     # Если DAM-методы сами управляют коммитами, то здесь явный коммит не нужен.
     # Если DAM-методы не коммитят, то коммит должен быть здесь, после успешного вызова actual_method.
-    async with managed_session(): # Сессия управляется здесь, но не передается явно в DAM
+    async with (
+        managed_session()
+    ):  # Сессия управляется здесь, но не передается явно в DAM
         try:
             # Проверка конфигурации ModelRegistry (важно для воркеров)
             if not ModelRegistry.is_configured():
-                 logger.error("ModelRegistry not configured in worker!")
-                 raise ConfigurationError("ModelRegistry not configured in worker environment.")
+                logger.error("ModelRegistry not configured in worker!")
+                raise ConfigurationError(
+                    "ModelRegistry not configured in worker environment."
+                )
 
             # Создание фабрики DAM. Сессия будет получена DAM-ом через get_current_session().
             # HTTP клиент и токен обычно не нужны для операций DAM, выполняемых воркером.
@@ -126,29 +135,46 @@ async def execute_dam_operation(
 
             # Получение нужного менеджера
             manager: "BaseDataAccessManager" = dam_factory.get_manager(model_name)
-            logger.debug(f"Worker Task: Obtained manager '{manager.__class__.__name__}' for model '{model_name}'.")
+            logger.debug(
+                f"Worker Task: Obtained manager '{manager.__class__.__name__}' for model '{model_name}'."
+            )
 
             # Поиск метода на менеджере
             if not hasattr(manager, method_name):
-                logger.error(f"Manager for model '{model_name}' has no method '{method_name}'")
-                raise AttributeError(f"Manager for model '{model_name}' has no method '{method_name}'")
+                logger.error(
+                    f"Manager for model '{model_name}' has no method '{method_name}'"
+                )
+                raise AttributeError(
+                    f"Manager for model '{model_name}' has no method '{method_name}'"
+                )
             actual_method = getattr(manager, method_name)
             if not callable(actual_method):
-                 logger.error(f"Attribute '{method_name}' on manager for '{model_name}' is not callable")
-                 raise TypeError(f"Attribute '{method_name}' on manager for '{model_name}' is not callable")
+                logger.error(
+                    f"Attribute '{method_name}' on manager for '{model_name}' is not callable"
+                )
+                raise TypeError(
+                    f"Attribute '{method_name}' on manager for '{model_name}' is not callable"
+                )
 
             # Десериализация аргументов
             try:
                 deserialized_args = [_deserialize_arg(arg) for arg in serialized_args]
-                deserialized_kwargs = {key: _deserialize_arg(value) for key, value in serialized_kwargs.items()}
+                deserialized_kwargs = {
+                    key: _deserialize_arg(value)
+                    for key, value in serialized_kwargs.items()
+                }
                 logger.debug(f"Worker Task: Deserialized Args: {deserialized_args}")
                 logger.debug(f"Worker Task: Deserialized Kwargs: {deserialized_kwargs}")
             except Exception as e:
-                 logger.exception("Error deserializing task arguments.")
-                 raise CoreSDKError("Failed to deserialize task arguments for broker task") from e
+                logger.exception("Error deserializing task arguments.")
+                raise CoreSDKError(
+                    "Failed to deserialize task arguments for broker task"
+                ) from e
 
             # Выполнение метода DAM
-            logger.info(f"Worker Task: Executing method '{actual_method.__name__}' on '{manager.__class__.__name__}'...")
+            logger.info(
+                f"Worker Task: Executing method '{actual_method.__name__}' on '{manager.__class__.__name__}'..."
+            )
             result = await actual_method(*deserialized_args, **deserialized_kwargs)
             logger.info(f"Worker Task: Method '{method_name}' executed successfully.")
             logger.debug(f"  Result type from DAM method: {type(result)}")
@@ -156,19 +182,25 @@ async def execute_dam_operation(
             # Сериализация результата для отправки обратно
             try:
                 serialized_result = _serialize_arg(result)
-                logger.debug(f"  Returning serialized result. Type after serialization: {type(serialized_result)}")
+                logger.debug(
+                    f"  Returning serialized result. Type after serialization: {type(serialized_result)}"
+                )
                 return serialized_result
             except Exception as e:
                 logger.exception("Error serializing task result.")
-                raise CoreSDKError("Failed to serialize task result after DAM execution") from e
+                raise CoreSDKError(
+                    "Failed to serialize task result after DAM execution"
+                ) from e
 
         except (ConfigurationError, AttributeError, TypeError) as e:
             # Ошибки, связанные с получением менеджера или метода
             logger.error(f"Setup error in worker task: {e}", exc_info=True)
-            raise # Перевыбрасываем, чтобы Taskiq пометил задачу как ошибочную
+            raise  # Перевыбрасываем, чтобы Taskiq пометил задачу как ошибочную
         except Exception as e:
             # Все остальные исключения, включая те, что пришли из actual_method (DAM)
             # (например, HTTPException, ValidationError, IntegrityError из DAM).
             # Taskiq должен обработать их как ошибку задачи.
-            logger.exception(f"Worker Task FAILED during execution of '{model_name}.{method_name}'.")
-            raise # Перевыбрасываем для корректной обработки Taskiq
+            logger.exception(
+                f"Worker Task FAILED during execution of '{model_name}.{method_name}'."
+            )
+            raise  # Перевыбрасываем для корректной обработки Taskiq

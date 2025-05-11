@@ -14,6 +14,7 @@ _language_cache: Optional[List[i18n_schemas.Language]] = None
 _country_cache: Optional[List[i18n_schemas.Country]] = None
 _currency_cache: Optional[List[i18n_schemas.Currency]] = None
 
+
 async def get_languages() -> List[i18n_schemas.Language]:
     """Возвращает список поддерживаемых языков."""
     global _language_cache
@@ -21,31 +22,34 @@ async def get_languages() -> List[i18n_schemas.Language]:
         return _language_cache
 
     languages = []
-    processed_codes = set() # Для избежания дубликатов, если pycountry дает несколько записей
+    processed_codes = (
+        set()
+    )  # Для избежания дубликатов, если pycountry дает несколько записей
 
     for lang in pycountry.languages:
         # Предпочитаем alpha_2 (ISO 639-1), если есть
-        code = getattr(lang, 'alpha_2', None)
+        code = getattr(lang, "alpha_2", None)
         if code and code not in processed_codes:
             try:
                 locale = Locale.parse(code)
                 # Используем английское название языка из Babel
-                name = locale.get_language_name('en')
+                name = locale.get_language_name("en")
                 # --- ИЗМЕНЕНИЕ: Создаем экземпляр схемы ---
                 languages.append(i18n_schemas.Language(code=code, name=name))
                 # -----------------------------------------
                 processed_codes.add(code)
             except UnknownLocaleError:
                 # print(f"Warning: Babel does not know language code {code}")
-                pass # Пропускаем языки, которые Babel не знает
+                pass  # Пропускаем языки, которые Babel не знает
             except Exception as e:
-                 print(f"Error processing language {code}: {e}")
+                print(f"Error processing language {code}: {e}")
 
     # Сортируем по имени
     languages.sort(key=lambda x: x.name)
     _language_cache = languages
     print(f"Loaded {len(languages)} languages.")
     return languages
+
 
 async def get_countries() -> List[i18n_schemas.Country]:
     """Возвращает список стран."""
@@ -55,14 +59,15 @@ async def get_countries() -> List[i18n_schemas.Country]:
 
     countries = []
     for country in pycountry.countries:
-         # --- ИЗМЕНЕНИЕ: Создаем экземпляр схемы ---
-         countries.append(i18n_schemas.Country(code=country.alpha_2, name=country.name))
-         # -----------------------------------------
+        # --- ИЗМЕНЕНИЕ: Создаем экземпляр схемы ---
+        countries.append(i18n_schemas.Country(code=country.alpha_2, name=country.name))
+        # -----------------------------------------
 
     countries.sort(key=lambda x: x.name)
     _country_cache = countries
     print(f"Loaded {len(countries)} countries.")
     return countries
+
 
 async def get_currencies() -> List[i18n_schemas.Currency]:
     """Возвращает список валют."""
@@ -73,9 +78,9 @@ async def get_currencies() -> List[i18n_schemas.Currency]:
     currencies = []
     # Используем Babel для получения списка валют и их названий
     # 'en' гарантирует английские названия
-    currency_names = Locale('en').currencies
-    for code in sorted(list_currencies()): # Сортируем коды для консистентности
-        name = currency_names.get(code, code) # Используем код, если имя не найдено
+    currency_names = Locale("en").currencies
+    for code in sorted(list_currencies()):  # Сортируем коды для консистентности
+        name = currency_names.get(code, code)  # Используем код, если имя не найдено
         # --- ИЗМЕНЕНИЕ: Создаем экземпляр схемы ---
         currencies.append(i18n_schemas.Currency(code=code, name=name))
         # -----------------------------------------

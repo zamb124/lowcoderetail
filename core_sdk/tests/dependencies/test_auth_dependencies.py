@@ -19,8 +19,12 @@ from core_sdk.schemas.auth_user import AuthenticatedUser
 
 pytestmark = pytest.mark.asyncio
 
+
 # --- Вспомогательные функции и фикстуры (без изменений) ---
-def create_mock_request(user_in_scope: Optional[AuthenticatedUser] = None, other_in_scope: Optional[Any] = None) -> Request:
+def create_mock_request(
+    user_in_scope: Optional[AuthenticatedUser] = None,
+    other_in_scope: Optional[Any] = None,
+) -> Request:
     scope = {"type": "http", "headers": Headers().raw, "user": user_in_scope}
     if other_in_scope is not None:
         scope["user"] = other_in_scope
@@ -29,6 +33,7 @@ def create_mock_request(user_in_scope: Optional[AuthenticatedUser] = None, other
     mock_req.scope = scope
     return mock_req
 
+
 @pytest.fixture
 def active_user() -> AuthenticatedUser:
     return AuthenticatedUser(
@@ -36,8 +41,9 @@ def active_user() -> AuthenticatedUser:
         email="active@example.com",
         is_active=True,
         is_superuser=False,
-        permissions=["orders:view", "products:edit"]
+        permissions=["orders:view", "products:edit"],
     )
+
 
 @pytest.fixture
 def inactive_user() -> AuthenticatedUser:
@@ -46,8 +52,9 @@ def inactive_user() -> AuthenticatedUser:
         email="inactive@example.com",
         is_active=False,
         is_superuser=False,
-        permissions=[]
+        permissions=[],
     )
+
 
 @pytest.fixture
 def super_user() -> AuthenticatedUser:
@@ -56,8 +63,9 @@ def super_user() -> AuthenticatedUser:
         email="super@example.com",
         is_active=True,
         is_superuser=True,
-        permissions=[]
+        permissions=[],
     )
+
 
 @pytest.fixture
 def active_user_no_perms() -> AuthenticatedUser:
@@ -66,8 +74,9 @@ def active_user_no_perms() -> AuthenticatedUser:
         email="noperms@example.com",
         is_active=True,
         is_superuser=False,
-        permissions=[]
+        permissions=[],
     )
+
 
 # --- Тесты для get_optional_current_user (без изменений) ---
 def test_get_optional_current_user_returns_user(active_user: AuthenticatedUser):
@@ -75,10 +84,12 @@ def test_get_optional_current_user_returns_user(active_user: AuthenticatedUser):
     user = get_optional_current_user(request)
     assert user == active_user
 
+
 def test_get_optional_current_user_returns_none_if_no_user():
     request = create_mock_request(user_in_scope=None)
     user = get_optional_current_user(request)
     assert user is None
+
 
 def test_get_optional_current_user_invalid_type_in_scope(caplog):
     request = create_mock_request(other_in_scope={"id": "not_a_user_object"})
@@ -86,29 +97,43 @@ def test_get_optional_current_user_invalid_type_in_scope(caplog):
     assert user is None
     assert "Invalid object type found in request.user" in caplog.text
 
+
 # --- Тесты для get_current_user (без изменений) ---
 def test_get_current_user_returns_user(active_user: AuthenticatedUser):
-    with mock.patch("core_sdk.dependencies.auth.get_optional_current_user", return_value=active_user):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_optional_current_user", return_value=active_user
+    ):
         # При прямом вызове функции, которая ожидает аргумент от Depends,
         # мы должны передать этот аргумент явно.
         user_result = get_current_user(user=active_user)
         assert user_result == active_user
 
+
 def test_get_current_user_raises_401_if_no_user():
-    with mock.patch("core_sdk.dependencies.auth.get_optional_current_user", return_value=None):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_optional_current_user", return_value=None
+    ):
         with pytest.raises(HTTPException) as exc_info:
             get_current_user(user=None)
         assert exc_info.value.status_code == 401
         assert exc_info.value.detail == "Not authenticated"
 
+
 # --- Тесты для get_current_active_user ---
 def test_get_current_active_user_returns_user(active_user: AuthenticatedUser):
-    with mock.patch("core_sdk.dependencies.auth.get_current_user", return_value=active_user):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_user", return_value=active_user
+    ):
         user_result = get_current_active_user(user=active_user)
         assert user_result == active_user
 
-def test_get_current_active_user_raises_400_if_inactive(inactive_user: AuthenticatedUser):
-    with mock.patch("core_sdk.dependencies.auth.get_current_user", return_value=inactive_user):
+
+def test_get_current_active_user_raises_400_if_inactive(
+    inactive_user: AuthenticatedUser,
+):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_user", return_value=inactive_user
+    ):
         with pytest.raises(HTTPException) as exc_info:
             get_current_active_user(user=inactive_user)
         assert exc_info.value.status_code == 400
@@ -117,33 +142,56 @@ def test_get_current_active_user_raises_400_if_inactive(inactive_user: Authentic
 
 # --- Тесты для get_current_superuser ---
 def test_get_current_superuser_returns_user(super_user: AuthenticatedUser):
-    with mock.patch("core_sdk.dependencies.auth.get_current_active_user", return_value=super_user):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_active_user", return_value=super_user
+    ):
         user_result = get_current_superuser(user=super_user)
         assert user_result == super_user
 
-def test_get_current_superuser_raises_403_if_not_superuser(active_user: AuthenticatedUser):
-    with mock.patch("core_sdk.dependencies.auth.get_current_active_user", return_value=active_user):
+
+def test_get_current_superuser_raises_403_if_not_superuser(
+    active_user: AuthenticatedUser,
+):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_active_user", return_value=active_user
+    ):
         with pytest.raises(HTTPException) as exc_info:
             get_current_superuser(user=active_user)
         assert exc_info.value.status_code == 403
         assert exc_info.value.detail == "The user doesn't have enough privileges"
 
+
 # --- Тесты для require_permission ---
-async def test_require_permission_grants_access_if_has_permission(active_user: AuthenticatedUser):
+async def test_require_permission_grants_access_if_has_permission(
+    active_user: AuthenticatedUser,
+):
     permission_checker_func = require_permission("orders:view")
-    with mock.patch("core_sdk.dependencies.auth.get_current_active_user", return_value=active_user):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_active_user", return_value=active_user
+    ):
         user_result = await permission_checker_func(user=active_user)
         assert user_result == active_user
 
-async def test_require_permission_grants_access_if_superuser(super_user: AuthenticatedUser):
+
+async def test_require_permission_grants_access_if_superuser(
+    super_user: AuthenticatedUser,
+):
     permission_checker_func = require_permission("some:specific:permission")
-    with mock.patch("core_sdk.dependencies.auth.get_current_active_user", return_value=super_user):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_active_user", return_value=super_user
+    ):
         user_result = await permission_checker_func(user=super_user)
         assert user_result == super_user
 
-async def test_require_permission_denies_access_if_no_permission(active_user_no_perms: AuthenticatedUser):
+
+async def test_require_permission_denies_access_if_no_permission(
+    active_user_no_perms: AuthenticatedUser,
+):
     permission_checker_func = require_permission("orders:delete")
-    with mock.patch("core_sdk.dependencies.auth.get_current_active_user", return_value=active_user_no_perms):
+    with mock.patch(
+        "core_sdk.dependencies.auth.get_current_active_user",
+        return_value=active_user_no_perms,
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await permission_checker_func(user=active_user_no_perms)
         assert exc_info.value.status_code == 403

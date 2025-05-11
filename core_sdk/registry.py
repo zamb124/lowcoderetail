@@ -1,15 +1,26 @@
 # core_sdk/registry.py
 import logging
-from typing import Type, Dict, Union, Optional, Literal, TypeVar, Any # List не используется напрямую в этом файле
+from typing import (
+    Type,
+    Dict,
+    Union,
+    Optional,
+    Literal,
+    TypeVar,
+    Any,
+)  # List не используется напрямую в этом файле
 
 from pydantic import BaseModel, HttpUrl, Field, ConfigDict
 from sqlmodel import SQLModel
 from pydantic import BaseModel as PydanticBaseModel
 from core_sdk.exceptions import ConfigurationError
-from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter # Переименовываем для ясности
+from fastapi_filter.contrib.sqlalchemy import (
+    Filter as BaseSQLAlchemyFilter,
+)  # Переименовываем для ясности
 
 # Используем TYPE_CHECKING для избежания циклического импорта с BaseDataAccessManager
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from core_sdk.data_access.base_manager import BaseDataAccessManager
 else:
@@ -19,36 +30,58 @@ else:
     try:
         from core_sdk.data_access.base_manager import BaseDataAccessManager
     except ImportError:
-        BaseDataAccessManager = TypeVar("BaseDataAccessManager") # type: ignore
+        BaseDataAccessManager = TypeVar("BaseDataAccessManager")  # type: ignore
 
-logger = logging.getLogger(__name__) # Имя будет core_sdk.registry
+logger = logging.getLogger(__name__)  # Имя будет core_sdk.registry
 
 # Типы для моделей и схем
-ModelClassType = TypeVar("ModelClassType", bound=PydanticBaseModel) # Уточненное имя
-SchemaClassType = TypeVar("SchemaClassType", bound=PydanticBaseModel) # Уточненное имя
+ModelClassType = TypeVar("ModelClassType", bound=PydanticBaseModel)  # Уточненное имя
+SchemaClassType = TypeVar("SchemaClassType", bound=PydanticBaseModel)  # Уточненное имя
+
 
 class RemoteConfig(BaseModel):
     """
     Конфигурация для удаленного доступа к модели через другой сервис.
     """
-    service_url: HttpUrl = Field(..., description="Базовый URL удаленного сервиса (например, 'http://users-service:8000').")
-    model_endpoint: str = Field(..., description="Путь к API эндпоинту модели на удаленном сервисе (например, '/api/v1/users').")
+
+    service_url: HttpUrl = Field(
+        ...,
+        description="Базовый URL удаленного сервиса (например, 'http://users-service:8000').",
+    )
+    model_endpoint: str = Field(
+        ...,
+        description="Путь к API эндпоинту модели на удаленном сервисе (например, '/api/v1/users').",
+    )
     # client_class и другие специфичные для клиента параметры больше не нужны здесь,
     # так как используется стандартизированный RemoteDataAccessManager.
 
     # model_config для Pydantic v2, если нужно (например, arbitrary_types_allowed)
     # model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class ModelInfo(PydanticBaseModel): # Наследуем от PydanticBaseModel для ConfigDict
-    model_cls: Type[ModelClassType] = Field(description="Класс модели (SQLModel или Pydantic).")
+
+class ModelInfo(PydanticBaseModel):  # Наследуем от PydanticBaseModel для ConfigDict
+    model_cls: Type[ModelClassType] = Field(
+        description="Класс модели (SQLModel или Pydantic)."
+    )
     # Типы create_schema_cls и update_schema_cls теперь могут быть любыми наследниками PydanticBaseModel
-    create_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для создания.")
-    update_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для обновления.")
+    create_schema_cls: Optional[Type[SchemaClassType]] = Field(
+        default=None, description="Pydantic схема для создания."
+    )
+    update_schema_cls: Optional[Type[SchemaClassType]] = Field(
+        default=None, description="Pydantic схема для обновления."
+    )
     # read_schema_cls может быть SQLModel или PydanticBaseModel, если он используется для парсинга ответов
-    read_schema_cls: Optional[Type[PydanticBaseModel]] = Field(default=None, description="Схема для чтения/сериализации (если отличается от model_cls).")
+    read_schema_cls: Optional[Type[PydanticBaseModel]] = Field(
+        default=None,
+        description="Схема для чтения/сериализации (если отличается от model_cls).",
+    )
     manager_cls: Type[Any] = Field(description="Класс менеджера данных.")
-    access_config: Union[RemoteConfig, Literal["local"]] = Field(description="Конфигурация доступа.")
-    filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = Field(default=None, description="Класс фильтра FastAPI-Filter.")
+    access_config: Union[RemoteConfig, Literal["local"]] = Field(
+        description="Конфигурация доступа."
+    )
+    filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = Field(
+        default=None, description="Класс фильтра FastAPI-Filter."
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -58,20 +91,23 @@ class ModelRegistry:
     Центральный реестр для регистрации моделей данных и связанной с ними информации.
     Позволяет унифицировать доступ к данным, независимо от того, локальные они или удаленные.
     """
+
     _registry: Dict[str, ModelInfo] = {}
     _is_configured: bool = False
 
     @classmethod
     def register(
-            cls,
-            model_name: str,
-            model_cls: Type[ModelClassType],
-            access_config: Union[RemoteConfig, Literal["local"]],
-            manager_cls: Type[Any], # Принимаем Any, проверка на BaseDataAccessManager будет в фабрике
-            filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
-            create_schema_cls: Optional[Type[SchemaClassType]] = None,
-            update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[PydanticBaseModel]] = None
+        cls,
+        model_name: str,
+        model_cls: Type[ModelClassType],
+        access_config: Union[RemoteConfig, Literal["local"]],
+        manager_cls: Type[
+            Any
+        ],  # Принимаем Any, проверка на BaseDataAccessManager будет в фабрике
+        filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
+        create_schema_cls: Optional[Type[SchemaClassType]] = None,
+        update_schema_cls: Optional[Type[SchemaClassType]] = None,
+        read_schema_cls: Optional[Type[PydanticBaseModel]] = None,
     ) -> None:
         """
         Регистрирует модель и связанную с ней информацию в реестре.
@@ -88,11 +124,17 @@ class ModelRegistry:
         """
         model_name = model_name.lower()
         if model_name in cls._registry:
-            logger.warning(f"Model name '{model_name}' is already registered. Overwriting previous configuration.")
+            logger.warning(
+                f"Model name '{model_name}' is already registered. Overwriting previous configuration."
+            )
 
         if filter_cls and not issubclass(filter_cls, BaseSQLAlchemyFilter):
-            logger.error(f"filter_cls for '{model_name}' must be a subclass of BaseSQLAlchemyFilter, but got {type(filter_cls)}.")
-            raise TypeError(f"filter_cls for '{model_name}' must be a subclass of fastapi_filter.contrib.sqlalchemy.Filter, got {type(filter_cls)}")
+            logger.error(
+                f"filter_cls for '{model_name}' must be a subclass of BaseSQLAlchemyFilter, but got {type(filter_cls)}."
+            )
+            raise TypeError(
+                f"filter_cls for '{model_name}' must be a subclass of fastapi_filter.contrib.sqlalchemy.Filter, got {type(filter_cls)}"
+            )
 
         # Если read_schema_cls не предоставлен, по умолчанию используется model_cls.
         effective_read_schema_cls = read_schema_cls or model_cls
@@ -104,13 +146,21 @@ class ModelRegistry:
             read_schema_cls=effective_read_schema_cls,
             manager_cls=manager_cls,
             access_config=access_config,
-            filter_cls=filter_cls
+            filter_cls=filter_cls,
         )
         cls._registry[model_name] = info
-        cls._is_configured = True # Помечаем, что реестр был сконфигурирован хотя бы раз
+        cls._is_configured = (
+            True  # Помечаем, что реестр был сконфигурирован хотя бы раз
+        )
 
-        access_type_str = f"remote ({access_config.service_url})" if isinstance(access_config, RemoteConfig) else access_config
-        manager_name = getattr(manager_cls, '__name__', str(manager_cls)) # Безопасное получение имени
+        access_type_str = (
+            f"remote ({access_config.service_url})"
+            if isinstance(access_config, RemoteConfig)
+            else access_config
+        )
+        manager_name = getattr(
+            manager_cls, "__name__", str(manager_cls)
+        )  # Безопасное получение имени
         filter_name = filter_cls.__name__ if filter_cls else "Default"
 
         logger.info(
@@ -120,14 +170,16 @@ class ModelRegistry:
 
     @classmethod
     def register_local(
-            cls,
-            model_cls: Type[ModelClassType],
-            manager_cls: Optional[Type[Any]] = None, # Может быть None, тогда фабрика использует BaseDataAccessManager
-            filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
-            create_schema_cls: Optional[Type[SchemaClassType]] = None,
-            update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[PydanticBaseModel]] = None,
-            model_name: Optional[str] = None
+        cls,
+        model_cls: Type[ModelClassType],
+        manager_cls: Optional[
+            Type[Any]
+        ] = None,  # Может быть None, тогда фабрика использует BaseDataAccessManager
+        filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
+        create_schema_cls: Optional[Type[SchemaClassType]] = None,
+        update_schema_cls: Optional[Type[SchemaClassType]] = None,
+        read_schema_cls: Optional[Type[PydanticBaseModel]] = None,
+        model_name: Optional[str] = None,
     ) -> None:
         """
         Упрощенный метод для регистрации локальной модели.
@@ -146,40 +198,52 @@ class ModelRegistry:
         # DataAccessManagerFactory подставит BaseDataAccessManager по умолчанию.
         effective_manager_cls = manager_cls
         if effective_manager_cls is None:
-            logger.debug(f"Registry: No specific manager provided for local model '{name_to_register}'. Factory will use BaseDataAccessManager.")
+            logger.debug(
+                f"Registry: No specific manager provided for local model '{name_to_register}'. Factory will use BaseDataAccessManager."
+            )
             # Явно передаем BaseDataAccessManager, чтобы ModelInfo его содержал,
             # даже если фабрика могла бы сделать это сама. Это делает ModelInfo более полным.
             # Импорт BaseDataAccessManager здесь безопасен, т.к. он уже должен быть доступен.
             try:
-                from core_sdk.data_access.base_manager import BaseDataAccessManager as DefaultManager
+                from core_sdk.data_access.base_manager import (
+                    BaseDataAccessManager as DefaultManager,
+                )
+
                 effective_manager_cls = DefaultManager
             except ImportError:
-                logger.error("Failed to import BaseDataAccessManager for default local registration. This is a critical SDK setup issue.")
+                logger.error(
+                    "Failed to import BaseDataAccessManager for default local registration. This is a critical SDK setup issue."
+                )
                 # Это критическая ошибка, если SDK не может найти свой базовый менеджер.
-                raise ConfigurationError("BaseDataAccessManager could not be imported for default local model registration.")
-
+                raise ConfigurationError(
+                    "BaseDataAccessManager could not be imported for default local model registration."
+                )
 
         cls.register(
             model_name=name_to_register,
             model_cls=model_cls,
             access_config="local",
-            manager_cls=effective_manager_cls, # Передаем None или указанный класс
+            manager_cls=effective_manager_cls,  # Передаем None или указанный класс
             filter_cls=filter_cls,
             create_schema_cls=create_schema_cls,
             update_schema_cls=update_schema_cls,
-            read_schema_cls=read_schema_cls
+            read_schema_cls=read_schema_cls,
         )
 
     @classmethod
     def register_remote(
-            cls,
-            model_cls: Type[PydanticBaseModel], # Класс-представление удаленной модели (например, UserRead)
-            config: RemoteConfig,
-            create_schema_cls: Optional[Type[SchemaClassType]] = None,
-            update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[PydanticBaseModel]] = None, # Схема для парсинга ответа
-            filter_cls: Optional[Type[ModelClassType]] = None,
-            model_name: Optional[str] = None
+        cls,
+        model_cls: Type[
+            PydanticBaseModel
+        ],  # Класс-представление удаленной модели (например, UserRead)
+        config: RemoteConfig,
+        create_schema_cls: Optional[Type[SchemaClassType]] = None,
+        update_schema_cls: Optional[Type[SchemaClassType]] = None,
+        read_schema_cls: Optional[
+            Type[PydanticBaseModel]
+        ] = None,  # Схема для парсинга ответа
+        filter_cls: Optional[Type[ModelClassType]] = None,
+        model_name: Optional[str] = None,
     ) -> None:
         """
         Упрощенный метод для регистрации удаленной модели.
@@ -200,11 +264,12 @@ class ModelRegistry:
             model_name=name_to_register.lower(),
             model_cls=model_cls,
             access_config=config,
-            manager_cls=Any, # Фабрика создаст RemoteDataAccessManager на основе access_config
-            filter_cls=filter_cls, # Фильтры обычно не применяются к удаленным менеджерам напрямую через FastAPI-Filter
+            manager_cls=Any,  # Фабрика создаст RemoteDataAccessManager на основе access_config
+            filter_cls=filter_cls,  # Фильтры обычно не применяются к удаленным менеджерам напрямую через FastAPI-Filter
             create_schema_cls=create_schema_cls,
             update_schema_cls=update_schema_cls,
-            read_schema_cls=read_schema_cls or model_cls # Если не указана, парсим в model_cls
+            read_schema_cls=read_schema_cls
+            or model_cls,  # Если не указана, парсим в model_cls
         )
 
     @classmethod
@@ -217,13 +282,19 @@ class ModelRegistry:
         :return: Экземпляр ModelInfo.
         """
         if not cls._is_configured:
-            logger.error(f"Attempted to get model info for '{model_name}', but ModelRegistry is not configured.")
-            raise ConfigurationError("ModelRegistry has not been configured. Ensure registration methods are called.")
+            logger.error(
+                f"Attempted to get model info for '{model_name}', but ModelRegistry is not configured."
+            )
+            raise ConfigurationError(
+                "ModelRegistry has not been configured. Ensure registration methods are called."
+            )
 
         info = cls._registry.get(model_name.lower())
         if info is None:
             logger.error(f"Model name '{model_name}' not found in ModelRegistry.")
-            raise ConfigurationError(f"Model name '{model_name}' not found in registry. Available models: {list(cls._registry.keys())}")
+            raise ConfigurationError(
+                f"Model name '{model_name}' not found in registry. Available models: {list(cls._registry.keys())}"
+            )
         return info
 
     @classmethod
@@ -250,20 +321,31 @@ class ModelRegistry:
                 model_info.update_schema_cls,
                 model_info.read_schema_cls,
                 # Также стоит пересобирать filter_cls, если он является Pydantic моделью
-                model_info.filter_cls
+                model_info.filter_cls,
             ]
             for pydantic_class in classes_to_rebuild:
-                if (pydantic_class and # Проверка на None
-                        isinstance(pydantic_class, type) and
-                        issubclass(pydantic_class, BaseModel) and # Убедимся, что это Pydantic модель
-                        pydantic_class not in rebuilt_classes):
+                if (
+                    pydantic_class  # Проверка на None
+                    and isinstance(pydantic_class, type)
+                    and issubclass(
+                        pydantic_class, BaseModel
+                    )  # Убедимся, что это Pydantic модель
+                    and pydantic_class not in rebuilt_classes
+                ):
                     try:
-                        logger.debug(f"  Rebuilding: {pydantic_class.__module__}.{pydantic_class.__name__}")
+                        logger.debug(
+                            f"  Rebuilding: {pydantic_class.__module__}.{pydantic_class.__name__}"
+                        )
                         pydantic_class.model_rebuild(force=force)
                         rebuilt_classes.add(pydantic_class)
                     except Exception as e:
-                        logger.error(f"  ERROR rebuilding {pydantic_class.__name__}: {e}", exc_info=True)
-        logger.info(f"Model rebuild finished. Processed {len(rebuilt_classes)} unique Pydantic classes.")
+                        logger.error(
+                            f"  ERROR rebuilding {pydantic_class.__name__}: {e}",
+                            exc_info=True,
+                        )
+        logger.info(
+            f"Model rebuild finished. Processed {len(rebuilt_classes)} unique Pydantic classes."
+        )
 
     @classmethod
     def clear(cls) -> None:
