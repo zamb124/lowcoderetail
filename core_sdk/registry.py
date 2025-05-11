@@ -4,7 +4,7 @@ from typing import Type, Dict, Union, Optional, Literal, TypeVar, Any # List н�
 
 from pydantic import BaseModel, HttpUrl, Field, ConfigDict
 from sqlmodel import SQLModel
-
+from pydantic import BaseModel as PydanticBaseModel
 from core_sdk.exceptions import ConfigurationError
 from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter # Переименовываем для ясности
 
@@ -45,8 +45,8 @@ class ModelInfo(BaseModel):
     конфигурацию доступа и класс фильтра.
     """
     model_cls: Type[SQLModel] = Field(description="Класс модели SQLModel.")
-    create_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для создания экземпляров модели.")
-    update_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для обновления экземпляров модели.")
+    create_schema_cls: Type[Union[SQLModel, PydanticBaseModel]] = Field(default=None, description="Pydantic схема для создания экземпляров модели.")
+    update_schema_cls: Type[Union[SQLModel, PydanticBaseModel]] = Field(default=None, description="Pydantic схема для обновления экземпляров модели.")
     read_schema_cls: Optional[Type[SQLModel]] = Field(default=None, description="SQLModel/Pydantic схема для чтения/сериализации экземпляров модели (если отличается от model_cls).")
     manager_cls: Type[Any] = Field(description="Класс менеджера данных (DataAccessManager) для этой модели.") # Тип Any, т.к. может быть BaseDataAccessManager или его наследник
     access_config: Union[RemoteConfig, Literal["local"]] = Field(description="Конфигурация доступа: 'local' или объект RemoteConfig.")
