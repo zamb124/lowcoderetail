@@ -1,57 +1,86 @@
 # core_sdk/tests/conftest.py
 import asyncio
+import contextvars
+import contextlib
 import os
 import sys
-import importlib
-import uuid
-from typing import AsyncGenerator, Generator, Type, Dict, Any, Optional as TypingOptional, List as TypingList
+from typing import AsyncGenerator, Generator, Type, Dict, Any, Optional as TypingOptional, List as TypingList, Optional
+from unittest import mock
 
+import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import StaticPool # Используем StaticPool для SQLite in-memory
-from sqlmodel import SQLModel, Field, create_engine as sqlmodel_create_engine
-from pydantic import BaseModel as PydanticBaseModel
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
+# StaticPool убран, будем использовать дефолтный пул для sqlite
+from sqlmodel import SQLModel, Field as SQLModelField, Field
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, HttpUrl
 
-# Добавляем корень проекта, если нужно (предполагаем, что тесты запускаются так, что core_sdk уже в пути)
-
-# Импорты из SDK
-from core_sdk.db.session import init_db as sdk_init_db, close_db as sdk_close_db, managed_session as sdk_managed_session, get_current_session as sdk_get_current_session
-from core_sdk.registry import ModelRegistry
+from core_sdk.db import session as sdk_db_session_module
+from core_sdk.db.session import managed_session as sdk_managed_session, get_current_session, init_db as sdk_init_db_func, close_db as sdk_close_db_func
+from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
 from core_sdk.data_access.base_manager import BaseDataAccessManager
 from core_sdk.data_access.manager_factory import DataAccessManagerFactory
 from core_sdk.filters.base import DefaultFilter
 from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter
+from core_sdk.config import BaseAppSettings
+from taskiq import AsyncBroker
 import logging
+import uuid
 
 logger = logging.getLogger("core_sdk.tests.conftest")
 
-# --- Тестовая модель и схемы (оставляем как есть) ---
-class Item(SQLModel, table=True):
-    __tablename__ = "sdk_test_items" # Уникальное имя таблицы для тестов SDK
-    id: TypingOptional[uuid.UUID] = Field(
-        default_factory=uuid.uuid4, # Генерируем UUID по умолчанию
-        primary_key=True,
-        index=True,
-        nullable=False # primary_key не может быть nullable
-    )
+# --- Вспомогательные классы (модели и схемы для тестов) ---
+# (Без изменений, оставляем как есть)
+class FactoryTestItem(SQLModel, table=True):
+    __tablename__ = "factory_test_items_sdk"
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    description: TypingOptional[str] = None
-    value: TypingOptional[int] = None
-    lsn: TypingOptional[int] = Field(default=None, unique=True, index=True) # Ручная установка
+    description: Optional[str] = None
 
-class ItemCreate(PydanticBaseModel): # Используем PydanticBaseModel для схем
+class FactoryTestItemCreate(PydanticBaseModel):
+    name: str
+    description: Optional[str] = None
+
+class FactoryTestItemUpdate(PydanticBaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+class FactoryTestItemRead(FactoryTestItem):
+    pass
+
+class CustomLocalFactoryItemManager(BaseDataAccessManager[FactoryTestItem, FactoryTestItemCreate, FactoryTestItemUpdate]):
+    pass
+
+class AnotherFactoryItem(SQLModel, table=True):
+    __tablename__ = "another_factory_items_sdk"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    value: str
+
+class AnotherFactoryItemRead(AnotherFactoryItem): pass
+
+class Item(SQLModel, table=True):
+    __tablename__ = "sdk_test_items_global_v2"
+    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    name: str = SQLModelField(index=True)
+    description: TypingOptional[str] = SQLModelField(default=None)
+    value: TypingOptional[int] = SQLModelField(default=None)
+    lsn: TypingOptional[int] = SQLModelField(default=None, unique=True, index=True)
+
+class ItemCreate(PydanticBaseModel):
     name: str
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
     lsn: TypingOptional[int] = None
+    model_config = ConfigDict(extra='allow')
 
 class ItemUpdate(PydanticBaseModel):
     name: TypingOptional[str] = None
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
+    model_config = ConfigDict(extra='allow')
 
-class ItemRead(Item): pass # SQLModel может быть и схемой Pydantic
+class ItemRead(Item): pass
 
 class ItemFilter(DefaultFilter):
     name: TypingOptional[str] = None
@@ -60,127 +89,210 @@ class ItemFilter(DefaultFilter):
     class Constants(DefaultFilter.Constants):
         model = Item
         search_model_fields = ["name", "description"]
-        #ordering_field_name = "lsn"
 
-# --- Фикстуры ---
+class CrudFactoryItem(SQLModel, table=True):
+    __tablename__ = "sdk_crud_factory_items_v2"
+    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+    description: TypingOptional[str] = SQLModelField(default=None)
+    value: TypingOptional[int] = SQLModelField(default=None)
+    lsn: TypingOptional[int] = SQLModelField(default=None, unique=True, index=True)
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+class CrudFactoryItemCreate(PydanticBaseModel):
+    name: str
+    description: TypingOptional[str] = None
+    value: TypingOptional[int] = None
+    model_config = ConfigDict(extra='allow')
+
+class CrudFactoryItemUpdate(PydanticBaseModel):
+    name: TypingOptional[str] = None
+    description: TypingOptional[str] = None
+    value: TypingOptional[int] = None
+    model_config = ConfigDict(extra='allow')
+
+class CrudFactoryItemRead(CrudFactoryItemCreate):
+    id: uuid.UUID
+    pass
+
+class CrudFactoryItemFilter(DefaultFilter):
+    name: TypingOptional[str] = None
+    class Constants(DefaultFilter.Constants):
+        model = CrudFactoryItem
+
+class CrudSimpleItem(SQLModel, table=True):
+    __tablename__ = "sdk_crud_simple_items_v2"
+    id: TypingOptional[uuid.UUID] = SQLModelField(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+
+class CrudSimpleItemRead(CrudSimpleItem): pass
+
+class AppSetupTestSettings(BaseAppSettings):
+    PROJECT_NAME: str = "SDKTestAppSetupProject"
+    API_V1_STR: str = "/api/sdktest_app"
+    DATABASE_URL: str = "sqlite+aiosqlite:///:memory:?cache=shared"
+    SECRET_KEY: str = "sdk_test_secret_appsetup"
+    ALGORITHM: str = "HS256"
+    DB_POOL_SIZE: int = 2
+    DB_MAX_OVERFLOW: int = 1
+    LOGGING_LEVEL: str = "DEBUG"
+    BACKEND_CORS_ORIGINS: TypingList[str] = ["http://test-origin.com"]
+    model_config = ConfigDict(extra='ignore')
+
+# --- Глобальные фикстуры для управления состоянием SDK ---
+
+@pytest.fixture(scope="session", autouse=True)
+def set_sdk_test_environment(request: pytest.FixtureRequest):
+    logger.info("Setting ENV=test for SDK test session.")
+    original_env_value = os.environ.get("ENV")
+    os.environ["ENV"] = "test"
+    def finalizer():
+        logger.info("Restoring original ENV after SDK test session.")
+        if original_env_value is None:
+            if "ENV" in os.environ: del os.environ["ENV"]
+        else: os.environ["ENV"] = original_env_value
+    request.addfinalizer(finalizer)
+
+# @pytest.fixture(scope="session")
+# def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
+#     loop = asyncio.get_event_loop_policy().new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     yield loop
+#     loop.close()
 
 @pytest_asyncio.fixture(scope="session")
-async def test_sqlite_engine_sdk(): # Переименовал, чтобы не конфликтовать, если тесты SDK и Core запускаются вместе
-    """Асинхронный SQLite in-memory движок для тестов SDK."""
+async def sdk_test_engine_instance(): # Переименовал для ясности
+    logger.info("Creating SDK test engine instance (session scope)...")
     engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:", # Новый in-memory для каждого запуска сессии
+        "sqlite+aiosqlite:///:memory:?cache=shared",
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool, # Важно для in-memory SQLite и create_all
         echo=False
     )
-    # Создаем все таблицы один раз за сессию
     async with engine.begin() as conn:
-        logger.info("Creating all SQLModel tables for SDK tests...")
         await conn.run_sync(SQLModel.metadata.create_all)
-        logger.info("SQLModel tables created for SDK tests.")
-
+    logger.info("SDK test tables created (or ensured to exist).")
     yield engine
-
-    logger.info("Disposing SDK test engine...")
+    logger.info("Disposing SDK test engine instance (session scope)...")
     await engine.dispose()
-    logger.info("SDK test engine disposed.")
 
-# Эта фикстура будет управлять глобальным состоянием DB в SDK для ВСЕХ тестов в этой сессии
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def manage_sdk_db_for_test_session(test_sqlite_engine_sdk: Any):
+@pytest_asyncio.fixture(scope="session")
+async def sdk_test_session_maker_instance(sdk_test_engine_instance: AsyncEngine) -> async_sessionmaker[AsyncSession]: # Переименовал
+    logger.debug("Creating SDK test session_maker instance (session scope)...")
+    return async_sessionmaker(bind=sdk_test_engine_instance, class_=AsyncSession, expire_on_commit=False)
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def auto_init_sdk_db_for_tests(
+        sdk_test_engine_instance: AsyncEngine,
+        sdk_test_session_maker_instance: async_sessionmaker[AsyncSession],
+        monkeypatch: pytest.MonkeyPatch
+):
     """
-    Инициализирует глобальные переменные DB в core_sdk.db.session, используя тестовый движок.
-    Выполняется один раз за тестовую сессию.
+    Автоматически инициализирует глобальные _db_engine и _db_session_maker
+    в модуле core_sdk.db.session перед каждым тестом и очищает их после.
+    Это гарантирует, что init_db() в коде SDK увидит "уже инициализированное" состояние,
+    а managed_session() будет использовать правильный session_maker.
     """
-    logger.info("manage_sdk_db_for_test_session: Initializing SDK's global DB state with test engine.")
-    # Передаем URL, но engine_options будут использовать наш тестовый движок через StaticPool
-    # Важно, чтобы init_db не создавал новый движок, если мы хотим использовать существующий.
-    # Оригинальный init_db создает новый движок. Нам нужно либо передать движок в init_db,
-    # либо установить глобальные _db_engine и _db_session_maker напрямую.
-    # Давайте попробуем установить напрямую, как в apps/core/conftest.py для manage_sdk_db_lifecycle
-    # но там init_db вызывается с DATABASE_URL.
+    logger.debug("auto_init_sdk_db_for_tests: Patching SDK's global DB variables.")
+    monkeypatch.setattr(sdk_db_session_module, "_db_engine", sdk_test_engine_instance)
+    monkeypatch.setattr(sdk_db_session_module, "_db_session_maker", sdk_test_session_maker_instance)
 
-    # Проблема: init_db в SDK создает свой движок. Нам нужно, чтобы он использовал НАШ тестовый.
-    # Решение: Патчить create_async_engine внутри init_db или передавать engine.
-    # Самый простой вариант для тестов SDK - напрямую установить глобальные переменные SDK.
+    # Также сбрасываем contextvar для чистоты перед тестом
+    sdk_db_session_module._current_session.set(None)
 
-    from core_sdk.db import session as sdk_session_globals
+    yield # Тест выполняется здесь
 
-    original_sdk_engine = sdk_session_globals._db_engine
-    original_sdk_session_maker = sdk_session_globals._db_session_maker
-
-    sdk_session_globals._db_engine = test_sqlite_engine_sdk
-    sdk_session_globals._db_session_maker = async_sessionmaker(
-        bind=test_sqlite_engine_sdk, class_=AsyncSession, expire_on_commit=False
-    )
-    logger.info(f"SDK's global _db_engine and _db_session_maker now point to test_sqlite_engine_sdk for session.")
-
-    yield
-
-    logger.info("manage_sdk_db_for_test_session: Restoring original SDK DB state (if any) and closing test setup.")
-    # await sdk_close_db() # Это попытается закрыть наш тестовый движок, что нормально.
-    # Но лучше восстановить оригинальные значения, если они были, а движок закроется своей фикстурой.
-    sdk_session_globals._db_engine = original_sdk_engine
-    sdk_session_globals._db_session_maker = original_sdk_session_maker
-    # sdk_close_db() здесь не нужен, так как test_sqlite_engine_sdk сам себя закроет.
+    logger.debug("auto_init_sdk_db_for_tests: Cleaning up SDK's global DB variables after test.")
+    # monkeypatch автоматически отменит изменения, но для ясности можно и вручную
+    # monkeypatch.undo() # или сбросить значения в None
+    sdk_db_session_module._db_engine = None
+    sdk_db_session_module._db_session_maker = None
+    sdk_db_session_module._current_session.set(None)
 
 
-# Эта фикстура будет управлять ModelRegistry для КАЖДОГО теста функции
 @pytest.fixture(scope="function", autouse=True)
-def manage_model_registry_for_test_function(manage_sdk_db_for_test_session: Any): # Зависит от инициализации БД SDK
-    """Очищает и настраивает ModelRegistry для каждого теста функции."""
+def manage_model_registry_for_tests():
+    # (Без изменений)
+    logger.debug("manage_model_registry_for_tests: Clearing ModelRegistry before test function.")
     ModelRegistry.clear()
     ModelRegistry.register_local(
-        model_cls=Item, create_schema_cls=ItemCreate, update_schema_cls=ItemUpdate,
-        read_schema_cls=ItemRead, filter_cls=ItemFilter, model_name="Item"
+        model_name="Item", model_cls=Item, create_schema_cls=ItemCreate,
+        update_schema_cls=ItemUpdate, read_schema_cls=ItemRead, filter_cls=ItemFilter
     )
-    if not ModelRegistry.is_configured(): # Добавим проверку
-        pytest.fail("manage_model_registry_for_test_function: ModelRegistry failed to configure.")
+    ModelRegistry.register_local(
+        model_name="CrudFactoryItem", model_cls=CrudFactoryItem,
+        create_schema_cls=CrudFactoryItemCreate, update_schema_cls=CrudFactoryItemUpdate,
+        read_schema_cls=CrudFactoryItemRead, filter_cls=CrudFactoryItemFilter
+    )
+    ModelRegistry.register_local(
+        model_name="CrudSimpleItem", model_cls=CrudSimpleItem,
+        read_schema_cls=CrudSimpleItemRead
+    )
+    ModelRegistry.register_local(
+        model_name="FactoryLocalItem", model_cls=FactoryTestItem,
+        manager_cls=CustomLocalFactoryItemManager,
+        create_schema_cls=FactoryTestItemCreate, update_schema_cls=FactoryTestItemUpdate,
+        read_schema_cls=FactoryTestItemRead
+    )
+    ModelRegistry.register_local(
+        model_name="FactoryLocalItemWithBaseDam", model_cls=AnotherFactoryItem,
+        read_schema_cls=AnotherFactoryItemRead
+    )
+    ModelRegistry.register_remote(
+        model_name="FactoryRemoteItem", model_cls=FactoryTestItemRead,
+        config=RemoteConfig(service_url=HttpUrl("http://remote-factory-service.com"), model_endpoint="/api/v1/factoryremoteitems"),
+        create_schema_cls=FactoryTestItemCreate, update_schema_cls=FactoryTestItemUpdate,
+        read_schema_cls=FactoryTestItemRead
+    )
+    if not ModelRegistry.is_configured():
+        pytest.fail("manage_model_registry_for_tests: ModelRegistry failed to configure after setup.")
     yield
+    logger.debug("manage_model_registry_for_tests: Clearing ModelRegistry after test function.")
     ModelRegistry.clear()
 
+
 @pytest_asyncio.fixture(scope="function")
-async def db_session(manage_model_registry_for_test_function: Any) -> AsyncGenerator[AsyncSession, None]:
-    """
-    Предоставляет сессию БД для одного теста, используя sdk_managed_session.
-    Зависит от manage_model_registry_for_test_function для правильного порядка.
-    Также очищает таблицы перед каждым тестом.
-    """
-    # sdk_managed_session будет использовать глобальный _db_session_maker,
-    # который был установлен фикстурой manage_sdk_db_for_test_session.
-    logger.debug(f"db_session fixture: Entering sdk_managed_session.")
-    async with sdk_managed_session() as session:
-        logger.debug(f"db_session fixture: Test session (id: {id(session)}) obtained.")
-        # Очистка таблиц перед каждым тестом
-        async with session.begin_nested(): # Используем begin_nested для независимости от внешней транзакции, если она есть
+async def db_session(
+        sdk_test_session_maker_instance: async_sessionmaker[AsyncSession], # Используем переименованную фикстуру
+        auto_init_sdk_db_for_tests: Any, # Зависимость от авто-инициализации
+        manage_model_registry_for_tests: Any
+) -> AsyncGenerator[AsyncSession, None]:
+    logger.debug("db_session fixture: Creating new session and setting contextvar...")
+    # auto_init_sdk_db_for_tests уже установил _db_session_maker в модуле SDK
+    # поэтому managed_session должен работать корректно
+    async with sdk_managed_session() as session: # Используем managed_session из SDK
+        logger.debug("db_session fixture: Clearing data from tables...")
+        async with session.begin_nested():
             for table in reversed(SQLModel.metadata.sorted_tables):
-                await session.execute(table.delete())
-        await session.commit() # Коммитим очистку
-        logger.debug(f"db_session fixture: Tables cleared. Yielding session.")
+                try:
+                    await session.execute(table.delete())
+                except Exception as e_del:
+                    logger.error(f"Error clearing table {table.name}: {e_del}")
+        await session.commit()
+        logger.debug("db_session fixture: Tables cleared.")
         yield session
-    logger.debug(f"db_session fixture: Exited sdk_managed_session.")
+    # managed_session сам закроет сессию и сбросит contextvar
 
 
 @pytest.fixture(scope="function")
-def dam_factory(manage_model_registry_for_test_function: Any) -> DataAccessManagerFactory:
-    # Зависит от manage_model_registry_for_test_function, чтобы реестр был готов.
-    # Сессия будет получена DAM через sdk_get_current_session(), который использует sdk_managed_session.
+def dam_factory(
+        manage_model_registry_for_tests: Any,
+) -> DataAccessManagerFactory:
+    logger.debug("dam_factory fixture: Creating DataAccessManagerFactory instance.")
     return DataAccessManagerFactory(registry=ModelRegistry)
 
-@pytest.fixture(scope="function")
-def item_manager(dam_factory: DataAccessManagerFactory, db_session) -> BaseDataAccessManager[Item, ItemCreate, ItemUpdate]:
-    return dam_factory.get_manager("Item")
 
-@pytest_asyncio.fixture(scope="function")
-async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]) -> TypingList[Item]:
-    # ... (код фикстуры sample_items как был, с ручной установкой lsn) ...
-    # Убедимся, что он использует item_manager, который уже работает с правильной сессией
+@pytest.fixture(scope="function")
+def item_manager(
+        dam_factory: DataAccessManagerFactory,
+        db_session: AsyncSession
+) -> BaseDataAccessManager[Item, ItemCreate, ItemUpdate]:
+    logger.debug("item_manager fixture: Getting 'Item' manager.")
+    manager = dam_factory.get_manager("Item")
+    return manager
+
+
+@pytest_asyncio.fixture
+async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession) -> TypingList[Item]:
+    # (Без изменений)
     logger.debug("sample_items fixture: Creating sample items...")
     items_data_with_lsn = [
         {"name": "Apple", "description": "Red fruit", "value": 10, "lsn": 100},
@@ -193,14 +305,61 @@ async def sample_items(item_manager: BaseDataAccessManager[Item, ItemCreate, Ite
     for data in items_data_with_lsn:
         item_create_data = ItemCreate(**data)
         created_item = await item_manager.create(item_create_data)
-        # Проверка и принудительная установка LSN, если create не установил его из схемы
-        if created_item.lsn != data["lsn"]:
-            logger.warning(f"LSN mismatch for {data['name']}: expected {data['lsn']}, got {created_item.lsn}. Forcing LSN.")
-            # Используем сессию, которую получит item_manager
-            async with item_manager.session.begin_nested():
-                stmt = Item.__table__.update().where(Item.id == created_item.id).values(lsn=data["lsn"])
-                await item_manager.session.execute(stmt)
-            await item_manager.session.commit() # Коммитим обновление LSN
-            await item_manager.session.refresh(created_item, attribute_names=['lsn'])
+        if created_item.lsn is None and data.get("lsn") is not None:
+            logger.warning(f"LSN for {data['name']} is None, setting manually to {data['lsn']}.")
+            created_item.lsn = data["lsn"]
+            item_manager.session.add(created_item)
+            await item_manager.session.commit()
+            await item_manager.session.refresh(created_item)
         created_items.append(created_item)
     return sorted(created_items, key=lambda x: x.lsn if x.lsn is not None else 0)
+
+
+# --- Фикстуры для test_app_setup.py и test_worker_setup.py ---
+@pytest.fixture
+def app_setup_settings() -> AppSetupTestSettings:
+    return AppSetupTestSettings()
+
+worker_settings = app_setup_settings
+
+
+# --- Моки для IO и глобальных объектов ---
+@pytest.fixture
+def mock_broker():
+    broker = mock.AsyncMock(spec=AsyncBroker)
+    broker.startup = mock.AsyncMock(name="broker_startup")
+    broker.shutdown = mock.AsyncMock(name="broker_shutdown")
+    return broker
+
+@pytest.fixture
+def mock_before_startup(): return mock.AsyncMock(name="mock_before_startup")
+@pytest.fixture
+def mock_after_startup(): return mock.AsyncMock(name="mock_after_startup")
+@pytest.fixture
+def mock_before_shutdown(): return mock.AsyncMock(name="mock_before_shutdown")
+@pytest.fixture
+def mock_after_shutdown(): return mock.AsyncMock(name="mock_after_shutdown")
+
+# Эти моки теперь не нужны глобально, если auto_init_sdk_db_for_tests работает
+@pytest.fixture
+def mock_sdk_init_db(): return mock.Mock(name="mock_sdk_init_db_app_setup")
+@pytest.fixture
+def mock_sdk_close_db(): return mock.AsyncMock(name="mock_sdk_close_db_app_setup")
+@pytest.fixture
+def mock_model_registry_rebuild(): return mock.Mock(name="mock_mr_rebuild_app_setup")
+
+@pytest.fixture
+def mock_app_http_client_lifespan_cm():
+    @contextlib.asynccontextmanager
+    async def _cm(app):
+        logger.debug("Mock app_http_client_lifespan entered.")
+        original_client = getattr(app.state, 'http_client', None)
+        app.state.http_client = mock.AsyncMock(spec=httpx.AsyncClient, name="mock_http_client_in_lifespan")
+        app.state.http_client_mocked = True
+        try:
+            yield
+        finally:
+            logger.debug("Mock app_http_client_lifespan exiting.")
+            app.state.http_client = original_client
+            app.state.http_client_mocked = False
+    return _cm

@@ -14,76 +14,22 @@ from core_sdk.data_access.base_manager import BaseDataAccessManager
 from core_sdk.data_access.remote_manager import RemoteDataAccessManager
 from core_sdk.exceptions import ConfigurationError
 from fastapi import Request as FastAPIRequest # Для мокирования типа Request
+from core_sdk.tests.conftest import (
+    # Модели, которые мы будем использовать для регистрации и тестирования фабрики
+    FactoryTestItem,
+    FactoryTestItemCreate,
+    FactoryTestItemUpdate,
+    FactoryTestItemRead,
+    AnotherFactoryItem,
+    AnotherFactoryItemRead,
+    # Фикстура для управления реестром
+    manage_model_registry_for_tests, CustomLocalFactoryItemManager  # Или manage_model_registry_sdk, если имя такое
+)
+
+
 
 # Используем тестовые модели и схемы из основного conftest, если они там определены и подходят.
 # Если нет, определяем здесь. Для изоляции тестов SDK лучше определить их здесь или в conftest SDK.
-
-# --- Вспомогательные классы (модели и схемы для тестов) ---
-# Эти классы используются только в этом тестовом файле.
-
-class FactoryTestItem(SQLModel, table=True):
-    __tablename__ = "factory_test_items_sdk" # Уникальное имя таблицы для тестов SDK
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    description: Optional[str] = None
-
-class FactoryTestItemCreate(PydanticBaseModel):
-    name: str
-    description: Optional[str] = None
-
-class FactoryTestItemUpdate(PydanticBaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-
-class FactoryTestItemRead(FactoryTestItem):
-    pass
-
-class CustomLocalFactoryItemManager(BaseDataAccessManager[FactoryTestItem, FactoryTestItemCreate, FactoryTestItemUpdate]):
-    # model, create_schema, update_schema могут быть установлены фабрикой
-    pass
-
-class AnotherFactoryItem(SQLModel, table=True):
-    __tablename__ = "another_factory_items_sdk"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    value: str
-
-class AnotherFactoryItemRead(AnotherFactoryItem): pass
-
-
-# --- Фикстуры ---
-@pytest.fixture(autouse=True)
-def clear_registry_before_each_test_in_factory_module(): # Уникальное имя фикстуры
-    """Очищает ModelRegistry перед каждым тестом в этом файле."""
-    ModelRegistry.clear()
-    yield
-    ModelRegistry.clear()
-
-@pytest.fixture
-def configured_registry_for_factory_tests(http_client: httpx.AsyncClient) -> Type[ModelRegistry]: # Уникальное имя
-    """Предоставляет ModelRegistry с несколькими зарегистрированными моделями для тестов фабрики."""
-    ModelRegistry.register_local(
-        model_name="FactoryLocalItem",
-        model_cls=FactoryTestItem,
-        manager_cls=CustomLocalFactoryItemManager,
-        create_schema_cls=FactoryTestItemCreate,
-        update_schema_cls=FactoryTestItemUpdate,
-        read_schema_cls=FactoryTestItemRead
-    )
-    ModelRegistry.register_local(
-        model_name="FactoryLocalItemWithBaseDam",
-        model_cls=AnotherFactoryItem,
-        read_schema_cls=AnotherFactoryItemRead
-    )
-    ModelRegistry.register_remote(
-        model_name="FactoryRemoteItem",
-        model_cls=FactoryTestItemRead,
-        config=RemoteConfig(service_url=HttpUrl("http://remote-factory-service.com"), model_endpoint="/api/v1/factoryremoteitems"),
-        create_schema_cls=FactoryTestItemCreate,
-        update_schema_cls=FactoryTestItemUpdate,
-        read_schema_cls=FactoryTestItemRead
-    )
-    assert ModelRegistry.is_configured()
-    return ModelRegistry
 
 @pytest_asyncio.fixture
 async def http_client() -> httpx.AsyncClient:
@@ -97,8 +43,8 @@ def test_factory_init_raises_if_registry_not_configured():
     with pytest.raises(ConfigurationError, match="ModelRegistry has not been configured"):
         DataAccessManagerFactory(registry=ModelRegistry)
 
-def test_get_local_manager_custom(configured_registry_for_factory_tests: Type[ModelRegistry], http_client: httpx.AsyncClient):
-    factory = DataAccessManagerFactory(http_client=http_client, registry=configured_registry_for_factory_tests)
+def test_get_local_manager_custom(http_client: httpx.AsyncClient):
+    factory = DataAccessManagerFactory(http_client=http_client, registry=ModelRegistry)
     manager = factory.get_manager("FactoryLocalItem")
 
     assert isinstance(manager, CustomLocalFactoryItemManager)
@@ -108,8 +54,8 @@ def test_get_local_manager_custom(configured_registry_for_factory_tests: Type[Mo
     assert manager.update_schema is FactoryTestItemUpdate
     assert manager._http_client is http_client
 
-def test_get_local_manager_base_if_none_registered(configured_registry_for_factory_tests: Type[ModelRegistry]):
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests)
+def test_get_local_manager_base_if_none_registered():
+    factory = DataAccessManagerFactory(registry=ModelRegistry)
     manager = factory.get_manager("FactoryLocalItemWithBaseDam")
 
     assert isinstance(manager, BaseDataAccessManager)
@@ -119,17 +65,17 @@ def test_get_local_manager_base_if_none_registered(configured_registry_for_facto
     assert manager.create_schema is None
     assert manager.update_schema is None
 
-def test_get_local_manager_invalid_manager_cls(configured_registry_for_factory_tests: Type[ModelRegistry]):
+def test_get_local_manager_invalid_manager_cls():
     class NotADam: pass
     ModelRegistry.register_local(model_name="FactoryInvalidDamItem", model_cls=FactoryTestItem, manager_cls=NotADam) # type: ignore
 
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests)
+    factory = DataAccessManagerFactory(registry=ModelRegistry)
     with pytest.raises(TypeError, match="is not a subclass of BaseDataAccessManager"):
         factory.get_manager("FactoryInvalidDamItem")
 
-def test_get_remote_manager_success(configured_registry_for_factory_tests: Type[ModelRegistry], http_client: httpx.AsyncClient):
+def test_get_remote_manager_success(http_client: httpx.AsyncClient):
     factory_token = "test_token_factory_main"
-    factory = DataAccessManagerFactory(http_client=http_client, auth_token=factory_token, registry=configured_registry_for_factory_tests)
+    factory = DataAccessManagerFactory(http_client=http_client, auth_token=factory_token, registry=ModelRegistry)
 
     mock_req_with_token = mock.Mock(spec=FastAPIRequest)
     mock_req_with_token.headers = {"Authorization": "Bearer request_specific_token"}
@@ -147,9 +93,9 @@ def test_get_remote_manager_success(configured_registry_for_factory_tests: Type[
     assert manager.create_schema is FactoryTestItemCreate
     assert manager.update_schema is FactoryTestItemUpdate
 
-def test_get_remote_manager_uses_factory_token_if_no_request_token(configured_registry_for_factory_tests: Type[ModelRegistry], http_client: httpx.AsyncClient):
+def test_get_remote_manager_uses_factory_token_if_no_request_token(http_client: httpx.AsyncClient):
     factory_auth_token = "factory_default_token"
-    factory = DataAccessManagerFactory(http_client=http_client, auth_token=factory_auth_token, registry=configured_registry_for_factory_tests)
+    factory = DataAccessManagerFactory(http_client=http_client, auth_token=factory_auth_token, registry=ModelRegistry)
 
     mock_req_no_token = mock.Mock(spec=FastAPIRequest); mock_req_no_token.headers = {}; mock_req_no_token.cookies = {}
     manager_with_empty_req = factory.get_manager("FactoryRemoteItem", request=mock_req_no_token)
@@ -158,13 +104,13 @@ def test_get_remote_manager_uses_factory_token_if_no_request_token(configured_re
     manager_no_request = factory.get_manager("FactoryRemoteItem") # request=None
     assert manager_no_request.auth_token == factory_auth_token
 
-def test_get_remote_manager_no_http_client_raises_error(configured_registry_for_factory_tests: Type[ModelRegistry]):
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests, http_client=None)
+def test_get_remote_manager_no_http_client_raises_error():
+    factory = DataAccessManagerFactory(registry=ModelRegistry, http_client=None)
     with pytest.raises(ConfigurationError, match="HTTP client required for remote manager 'FactoryRemoteItem'"):
         factory.get_manager("FactoryRemoteItem")
 
-def test_manager_caching(configured_registry_for_factory_tests: Type[ModelRegistry], http_client: httpx.AsyncClient):
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests, http_client=http_client)
+def test_manager_caching(http_client: httpx.AsyncClient):
+    factory = DataAccessManagerFactory(registry=ModelRegistry, http_client=http_client)
 
     manager1 = factory.get_manager("FactoryLocalItemWithBaseDam")
     manager2 = factory.get_manager("FactoryLocalItemWithBaseDam")
@@ -179,13 +125,13 @@ def test_manager_caching(configured_registry_for_factory_tests: Type[ModelRegist
     remote_manager2 = factory.get_manager("FactoryRemoteItem", request=mock_req)
     assert remote_manager1 is remote_manager2
 
-def test_get_manager_model_not_found(configured_registry_for_factory_tests: Type[ModelRegistry]):
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests)
+def test_get_manager_model_not_found():
+    factory = DataAccessManagerFactory(registry=ModelRegistry)
     # ModelRegistry.get_model_info выбрасывает ошибку с оригинальным именем (не lowercased)
     with pytest.raises(ConfigurationError, match="Model name 'NonExistentFactoryModel' not found in registry"):
         factory.get_manager("NonExistentFactoryModel")
 
-def test_get_manager_invalid_access_config(configured_registry_for_factory_tests: Type[ModelRegistry]):
+def test_get_manager_invalid_access_config():
     # ModelRegistry хранит ключи в нижнем регистре
     model_key_in_registry = "factorylocalitem"
     original_model_name_case = "FactoryLocalItem"
@@ -196,7 +142,7 @@ def test_get_manager_invalid_access_config(configured_registry_for_factory_tests
     modified_info = original_info.model_copy(update={"access_config": "invalid_string_config"}) # type: ignore
     ModelRegistry._registry[model_key_in_registry] = modified_info
 
-    factory = DataAccessManagerFactory(registry=configured_registry_for_factory_tests)
+    factory = DataAccessManagerFactory(registry=ModelRegistry)
     # Сообщение об ошибке будет содержать имя модели в том виде, в каком оно было передано в get_manager
     with pytest.raises(ConfigurationError, match=f"Invalid access config type for '{original_model_name_case}'"):
         factory.get_manager(original_model_name_case)

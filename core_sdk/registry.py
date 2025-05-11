@@ -40,7 +40,7 @@ class RemoteConfig(BaseModel):
     # model_config = ConfigDict(arbitrary_types_allowed=True)
 
 class ModelInfo(PydanticBaseModel): # Наследуем от PydanticBaseModel для ConfigDict
-    model_cls: Type[SQLModel] = Field(description="Класс модели SQLModel.")
+    model_cls: Type[ModelClassType] = Field(description="Класс модели (SQLModel или Pydantic).")
     # Типы create_schema_cls и update_schema_cls теперь могут быть любыми наследниками PydanticBaseModel
     create_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для создания.")
     update_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для обновления.")

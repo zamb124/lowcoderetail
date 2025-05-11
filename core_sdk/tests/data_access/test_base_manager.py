@@ -1,22 +1,37 @@
 # core_sdk/tests/data_access/test_base_manager.py
 import pytest
-import uuid # Не используется напрямую, но может понадобиться для других моделей
+import uuid
 from typing import List, Optional, Dict, Any
 
-import pytest_asyncio
-from sqlalchemy.ext.asyncio import AsyncSession # Для type hinting
+import pytest_asyncio # Убедимся, что импортирован для @pytest_asyncio.fixture
+from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field as PydanticField, ValidationError
-from starlette.exceptions import HTTPException
+from starlette.exceptions import HTTPException # Используем из starlette
 
 from core_sdk.data_access.base_manager import BaseDataAccessManager
+# Убираем импорты DataAccessManagerFactory и ModelRegistry, если они не используются напрямую в этом файле
+# from data_access import DataAccessManagerFactory # Вероятно, это apps.frontend.data_access, не нужно здесь
+# from registry import ModelRegistry # Вероятно, это apps.frontend.registry, не нужно здесь
+
+# Импортируем тестовые модели/схемы из общего conftest SDK
+from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead, ItemFilter
+import logging # Добавим логгирование для тестов
+
 from data_access import DataAccessManagerFactory
 from registry import ModelRegistry
-from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead, ItemFilter # Импортируем тестовые модели/схемы
 
-pytestmark = pytest.mark.asyncio # Все тесты в этом файле асинхронные
+test_logger = logging.getLogger("core_sdk.tests.test_base_manager")
 
+pytestmark = pytest.mark.asyncio
 # --- Тесты для CREATE ---
-async def test_create_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession):
+
+@pytest.fixture(autouse=True)
+def manage_registry_for_crud_tests(manage_model_registry_for_tests: Any): # Зависим от общей фикстуры
+    """Эта фикстура просто существует, чтобы показать зависимость от общей настройки реестра."""
+    pass
+
+async def test_create_item_success(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session): # <--- ДОБАВЛЕНА db_session
+    test_logger.info("--- test_create_item_success START ---")
     item_data = ItemCreate(name="Test Item 1", description="Description 1", value=100, lsn=1)
     created_item = await item_manager.create(item_data)
 
@@ -25,12 +40,12 @@ async def test_create_item_success(item_manager: BaseDataAccessManager[Item, Ite
     assert created_item.name == item_data.name
     assert created_item.description == item_data.description
     assert created_item.value == item_data.value
-    assert created_item.lsn is not None
+    assert created_item.lsn == item_data.lsn # Проверяем установленный LSN
 
-    # Проверяем, что объект действительно в БД
-    fetched_item = await db_session.get(Item, created_item.id)
+    fetched_item = await db_session.get(Item, created_item.id) # Используем db_session для проверки
     assert fetched_item is not None
     assert fetched_item.name == item_data.name
+    test_logger.info("--- test_create_item_success END ---")
 
 async def test_create_item_with_dict(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], db_session: AsyncSession):
     item_data_dict = {"name": "Test Item Dict", "value": 200}

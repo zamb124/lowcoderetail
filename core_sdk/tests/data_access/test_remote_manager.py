@@ -118,8 +118,7 @@ async def test_remote_list_success(remote_item_manager: RemoteDataAccessManager,
 
     items_list_dict = await remote_item_manager.list(limit=2)
 
-    assert "items" in items_list_dict
-    items = items_list_dict["items"]
+    items = items_list_dict
     assert len(items) == 2
     assert isinstance(items[0], ItemRead)
     assert items[0].name == "Item A"

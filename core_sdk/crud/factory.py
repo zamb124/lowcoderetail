@@ -1,10 +1,10 @@
 # core_sdk/crud/factory.py
 import logging
-from typing import Type, List, Optional, Any, Union, Dict, TypeVar, cast
+from typing import Type, List, Optional, Any, Union, Dict, TypeVar, cast, ClassVar
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, Path, status
-from pydantic import BaseModel, create_model, ValidationError
+from pydantic import BaseModel, create_model, ValidationError, ConfigDict
 from sqlmodel import SQLModel
 
 from core_sdk.registry import ModelRegistry, ModelInfo
@@ -49,56 +49,92 @@ class CRUDRouterFactory:
             self.model_info = ModelRegistry.get_model_info(model_name)
         except ConfigurationError as e:
             logger.error(f"CRUDRouterFactory: Failed to get ModelInfo for '{model_name}': {e}")
-            raise
+            raise e
 
-        self.model_cls = self.model_info.model_cls
+        # Убедимся, что model_cls это SQLModel, если DefaultFilter ожидает это
+        if not issubclass(self.model_info.model_cls, SQLModel):
+            logger.warning(
+                f"Model class {self.model_info.model_cls.__name__} for "
+                f"{model_name} is not SQLModel. DefaultFilter might not work as expected."
+            )
+
+        self.model_cls = self.model_info.model_cls # Это может быть PydanticBaseModel или SQLModel
         self.create_schema_cls = self.model_info.create_schema_cls
         self.update_schema_cls = self.model_info.update_schema_cls
-        # Гарантируем, что read_schema_cls всегда есть, используем model_cls как fallback
         self.read_schema_cls = cast(Type[ReadSchemaType], self.model_info.read_schema_cls or self.model_cls)
 
-        # --- Определение класса фильтра ---
+
         registered_filter_cls = self.model_info.filter_cls
         if registered_filter_cls and issubclass(registered_filter_cls, BaseSQLAlchemyFilter):
             self.filter_cls = registered_filter_cls
             logger.debug(f"CRUDRouterFactory for '{model_name}': Using registered filter {self.filter_cls.__name__}")
-            # Проверка и возможное исправление Constants.model
             if not hasattr(self.filter_cls, 'Constants') or not hasattr(self.filter_cls.Constants, 'model'):
                 logger.warning(f"Registered filter {self.filter_cls.__name__} is missing 'Constants.model'. Dynamically adding.")
                 class TempConstants(self.filter_cls.Constants if hasattr(self.filter_cls, 'Constants') else object):
-                    model = self.model_cls
-                # Создаем новый класс фильтра с исправленными Constants
+                    model = self.model_cls # Используем self.model_cls, который может быть Pydantic
                 self.filter_cls = type(f"{self.filter_cls.__name__}WithModel", (self.filter_cls,), {'Constants': TempConstants})
-                try: self.filter_cls.model_rebuild(force=True) # type: ignore
-                except Exception: pass # Игнорируем ошибки ребилда
+                try:
+                    if hasattr(self.filter_cls, 'model_rebuild'): self.filter_cls.model_rebuild(force=True) # type: ignore
+                except Exception: pass
         else:
             if registered_filter_cls:
-                logger.warning(f"CRUDRouterFactory for '{model_name}': Registered filter_cls {registered_filter_cls.__name__} is not valid. Falling back to DefaultFilter.")
-            logger.debug(f"CRUDRouterFactory for '{model_name}': No valid filter registered, using DefaultFilter.")
+                logger.warning(f"CRUDRouterFactory for '{model_name}': Registered filter_cls ... Falling back.")
+            logger.debug(f"CRUDRouterFactory for '{model_name}': No valid filter registered, creating DefaultFilter derivative.")
 
-            # Создаем DefaultFilter с Constants динамически, если кастомный не найден или некорректен
+            # Убедимся, что self.model_cls для DefaultFilter является SQLModel
+            model_for_filter_constants = self.model_cls
+            if not issubclass(self.model_cls, SQLModel):
+                logger.warning(f"DefaultFilter requires an SQLModel for its Constants.model, but got {self.model_cls.__name__}. DefaultFilter might not work correctly.")
+                # В этом случае DefaultFilter не сможет построить запросы SQLAlchemy.
+                # Можно создать "пустой" SQLModel для Constants, но это не решит проблему фильтрации.
+                # Либо DefaultFilter должен быть более гибким или нужен другой базовый фильтр для не-SQLModel.
+                # Пока оставляем как есть, но это потенциальная проблема для remote моделей.
+                # Для локальных моделей self.model_cls всегда SQLModel.
+
             search_fields = [
-                name for name, field_info in self.model_cls.model_fields.items()
-                if field_info.annotation is str or field_info.annotation is Optional[str]
+                name for name, field_info in model_for_filter_constants.model_fields.items()
+                if hasattr(field_info, 'annotation') and (field_info.annotation is str or field_info.annotation is Optional[str])
             ]
-            # Определяем имя ordering_field_name из DefaultFilter.Constants или BaseFilter.Constants
-            # FastAPI-Filter сам использует "order_by" по умолчанию для этого поля в DefaultFilter
-            # и "ordering_field_name" в BaseFilter.Constants.
-            # Здесь мы используем "order_by" как имя query-параметра для DefaultFilter.
-            ordering_field_name = getattr(DefaultFilter.Constants, "ordering_field_name", "order_by")
 
-            class RuntimeConstants(DefaultFilter.Constants):
-                model = self.model_cls
-                search_model_fields = search_fields
-
-            # Используем create_model для создания нового класса Pydantic "на лету"
-            self.filter_cls = create_model( # type: ignore
-                f"{self.model_name}DefaultCRUDFilter",
-                __base__=DefaultFilter,
-                Constants=(RuntimeConstants, ...) # Передаем класс Constants
+            # 1. Создаем класс Constants "на лету"
+            runtime_constants_class_name = f"{self.model_name}RuntimeFilterConstants"
+            RuntimeConstantsClass = type(
+                runtime_constants_class_name,
+                (DefaultFilter.Constants,),
+                {
+                    'model': model_for_filter_constants,
+                    'search_model_fields': search_fields,
+                    '__module__': DefaultFilter.Constants.__module__,
+                    '__qualname__': f"{DefaultFilter.Constants.__qualname__}.{runtime_constants_class_name}"
+                }
             )
-            try: self.filter_cls.model_rebuild(force=True) # type: ignore
-            except Exception: pass # Игнорируем ошибки ребилда
+
+            # 2. Создаем класс фильтра "на лету"
+            filter_class_name = f"{self.model_name}DefaultCRUDFilter"
+
+            # Определяем атрибуты для нового класса фильтра
+            filter_attrs = {
+                "Constants": RuntimeConstantsClass, # Передаем класс Constants
+                "__module__": DefaultFilter.__module__,
+                "__qualname__": f"{DefaultFilter.__qualname__}.{filter_class_name}",
+                "model_config": ConfigDict(populate_by_name=True, extra='allow', arbitrary_types_allowed=True) # Добавил arbitrary_types_allowed
+            }
+
+            # Аннотируем Constants как ClassVar, чтобы Pydantic его не считал полем
+            # Это делается путем добавления в __annotations__
+            filter_attrs["__annotations__"] = {"Constants": ClassVar[Type[RuntimeConstantsClass]]} # type: ignore
+
+            self.filter_cls = type(
+                filter_class_name,
+                (DefaultFilter,),
+                filter_attrs
+            )
+
+            try:
+                if hasattr(self.filter_cls, 'model_rebuild'):
+                    self.filter_cls.model_rebuild(force=True)
+            except Exception as e_rebuild:
+                logger.warning(f"Could not rebuild dynamically created filter class {self.filter_cls.__name__}: {e_rebuild}")
 
         # --- Инициализация роутера и добавление маршрутов ---
         self.router = APIRouter(prefix=prefix, tags=tags or [model_name.capitalize().replace("_", " ")])

@@ -172,45 +172,44 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
             return None # Явный возврат None, если ошибка была 404 и прошла через ServiceCommunicationError
 
     async def list(
-        self,
-        *, # Делает параметры только именованными для ясности
-        cursor: Optional[int] = None,
-        limit: int = 50,
-        filters: Optional[Mapping[str, Any]] = None,
-        direction: Optional[str] = 'asc'
-    ) -> List[ModelType]:
-        """
-        Получает список объектов с поддержкой курсорной пагинации и фильтрации.
-
-        :param cursor: LSN (Log Sequence Number) или аналогичный курсор для следующей страницы.
-        :param limit: Максимальное количество объектов для возврата.
-        :param filters: Словарь с параметрами фильтрации.
-                       Значения будут преобразованы в строки для URL.
-        :return: Список экземпляров `ModelType`.
-        :raises ServiceCommunicationError: При ошибках связи или некорректном формате ответа.
-        """
-        url = f"{self.api_base_url}"
+            self,
+            *,
+            cursor: Optional[int] = None,
+            limit: int = 50,
+            filters: Optional[Mapping[str, Any]] = None,
+            direction: Optional[str] = 'asc' # Добавим direction, если API его поддерживает
+    ) -> List[ModelType]: # Возвращает список моделей
+        url = f"{self.api_base_url}" # Для списка обычно базовый URL ресурса
         params: Dict[str, Any] = {"limit": limit}
-        if cursor is not None:
-            params["cursor"] = cursor
+        if cursor is not None: params["cursor"] = cursor
+        if direction is not None: params["direction"] = direction # Добавляем direction в параметры
         if filters:
             for key, value in filters.items():
                 if value is not None:
-                    # TODO: Рассмотреть более сложную сериализацию фильтров, если значения - списки или другие объекты.
-                    # Сейчас просто преобразуем в строку.
-                    params[key] = str(value)
+                    if isinstance(value, list): # Если фильтр - это список (например, для id__in)
+                        # httpx правильно обработает список значений для одного ключа query параметра
+                        params[key] = [str(v) for v in value]
+                    else:
+                        params[key] = str(value)
+
         logger.info(f"Fetching list of items from {url} with params: {params}")
         response = await self._request("GET", url, params=params, allowed_statuses=[200])
-        items_data = response.json()
-        if not isinstance(items_data['items'], list):
-             logger.error(f"Invalid response format from {url}: expected a list, got {type(items_data)}")
-             raise ServiceCommunicationError(f"Invalid response format from {url}: expected a list, got {type(items_data).__name__}", url=url)
-        return {
-            'items': [self.model_cls.model_validate(item) for item in items_data['items']],
-            "next_cursor": items_data.get("next_cursor"),
-            "limit": items_data.get("limit"),
-            "count": items_data.get("count"),
-        }
+        response_json = response.json()
+
+        # Проверяем, является ли ответ словарем с ключом 'items' (как от PaginatedResponse)
+        if isinstance(response_json, dict) and "items" in response_json:
+            items_data = response_json["items"]
+        elif isinstance(response_json, list): # Если API сразу возвращает список
+            items_data = response_json
+        else:
+            logger.error(f"Invalid response format from {url} for list: expected a list or dict with 'items', got {type(response_json)}")
+            raise ServiceCommunicationError(f"Invalid list response format from {url}", url=url)
+
+        if not isinstance(items_data, list):
+            logger.error(f"Invalid 'items' format in list response from {url}: expected a list, got {type(items_data)}")
+            raise ServiceCommunicationError(f"Invalid 'items' format in list response from {url}", url=url)
+
+        return [self.model_cls.model_validate(item) for item in items_data]
 
     async def create(self, data: CreateSchemaType) -> ModelType:
         """
