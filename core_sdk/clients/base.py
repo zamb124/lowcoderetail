@@ -267,7 +267,7 @@ class RemoteServiceClient(Generic[ModelType, CreateSchemaType, UpdateSchemaType]
             # Фактически, если _request работает правильно с allowed_statuses,
             # сюда должны попадать только непредвиденные ошибки, а не 204/404.
             logger.error(f"Error deleting item {item_id} at {url}: {e}", exc_info=True)
-            return False # Возвращаем False при ошибке
+            raise e # Возвращаем False при ошибке
 
     async def close(self) -> None:
         """

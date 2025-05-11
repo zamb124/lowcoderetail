@@ -61,7 +61,7 @@ async def test_get_item_not_found(item_manager: BaseDataAccessManager[Item, Item
     # Используем фиктивный ID, которого нет в БД
     # В SQLite ID обычно int, но для общего случая можно использовать UUID, если модель его поддерживает
     # Наша тестовая модель Item использует int ID.
-    non_existent_id = 99999
+    non_existent_id = uuid.uuid4()
     fetched_item = await item_manager.get(non_existent_id) # type: ignore
     assert fetched_item is None
 
@@ -87,7 +87,7 @@ async def test_update_item_with_dict(item_manager: BaseDataAccessManager[Item, I
     assert updated_item.name == "Dict Update Original" # Не меняли
 
 async def test_update_item_not_found(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
-    non_existent_id = 99998
+    non_existent_id = uuid.uuid4()
     update_data = ItemUpdate(name="Won't Update")
     with pytest.raises(HTTPException) as exc_info:
         await item_manager.update(non_existent_id, update_data) # type: ignore
@@ -116,7 +116,7 @@ async def test_delete_item_success(item_manager: BaseDataAccessManager[Item, Ite
     assert deleted_item_from_db is None
 
 async def test_delete_item_not_found(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
-    non_existent_id = 99997
+    non_existent_id = uuid.uuid4()
     with pytest.raises(HTTPException) as exc_info:
         await item_manager.delete(non_existent_id) # type: ignore
     assert exc_info.value.status_code == 404
@@ -171,14 +171,14 @@ async def test_list_items_desc_pagination(item_manager: BaseDataAccessManager[It
     assert result_desc1["items"][1].name == "Date"
     assert result_desc1["items"][2].name == "Cherry"
     # next_cursor в DESC указывает на LSN первого элемента в текущем наборе (самого нового из этой пачки)
-    assert result_desc1["next_cursor"] == result_desc1["items"][0].lsn
+    assert result_desc1["next_cursor"] == result_desc1["items"][-1].lsn
 
     # Запрашиваем "предыдущую" страницу в DESC (элементы с меньшим LSN)
     result_desc2 = await item_manager.list(cursor=result_desc1["next_cursor"], limit=3, direction="desc")
     assert len(result_desc2["items"]) == 2
     assert result_desc2["items"][0].name == "Banana"
     assert result_desc2["items"][1].name == "Apple"
-    assert result_desc2["next_cursor"] == result_desc2["items"][0].lsn
+    assert result_desc2["next_cursor"] == result_desc2["items"][-1].lsn
 
 async def test_list_items_filter_exact_name(item_manager: BaseDataAccessManager[Item, ItemCreate, ItemUpdate], sample_items: List[Item]):
     # Используем словарь для фильтров
@@ -262,7 +262,7 @@ class CustomItemManager(BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
         await super()._prepare_for_delete(db_item)
 
 @pytest.fixture
-def custom_item_manager(db_session_management) -> CustomItemManager: # Зависит от db_session_management для ModelRegistry
+def custom_item_manager(db_session) -> CustomItemManager: # Зависит от db_session_management для ModelRegistry
     # Регистрируем CustomItemManager для модели "Item" на время этого теста
     # Важно, чтобы ModelRegistry был очищен/восстановлен после теста
     # Фикстура db_session_management уже это делает.

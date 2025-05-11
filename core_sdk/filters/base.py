@@ -83,7 +83,7 @@ class DefaultFilter(BaseFilter):
     class Constants(BaseFilter.Constants):
          model: Type[SQLModel]
          # search_model_fields: List[str] = [] # Определяется в дочернем классе или CRUDRouterFactory
-         # ordering_field_name: str = "order_by" # Уже определено в BaseFilter.Constants
+         #ordering_field_name: str = "order_by" # Уже определено в BaseFilter.Constants
 
 # Логгируем факт определения класса (для отладки импортов)
 logger.debug(f"{__name__} loaded, DefaultFilter class defined.")

@@ -137,9 +137,12 @@ class BaseDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaTyp
             actual_filter_cls = self._get_filter_class()
             if isinstance(filters, Mapping):
                 logger.debug(f"Received dict filters. Validating against {actual_filter_cls.__name__}.")
-                try: filter_obj = actual_filter_cls.model_validate(filters)
-                except ValidationError as ve: raise HTTPException(status_code=422, detail=f"Invalid filter parameters: {ve.errors()}")
-                except Exception as e: raise HTTPException(status_code=500, detail=f"Internal error processing filters: {e}")
+                try:
+                    filter_obj = actual_filter_cls.model_validate(filters)
+                except ValidationError as ve:
+                    raise HTTPException(status_code=422, detail=f"Invalid filter parameters: {ve.errors()}")
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=f"Internal error processing filters: {e}")
             elif isinstance(filters, BaseFilter):
                 if not isinstance(filters, actual_filter_cls):
                     logger.warning(f"Received filter object of type {type(filters).__name__}, but expected {actual_filter_cls.__name__}. Proceeding.")
@@ -210,13 +213,7 @@ class BaseDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaTyp
         output_next_cursor: int
 
         if count > 0:
-            if direction == "asc":
-                # Для ASC, next_cursor это LSN последнего (самого "нового" в текущем наборе) элемента.
-                output_next_cursor = items_from_db[-1].lsn
-            else: # direction == "desc"
-                # Для DESC, items_from_db отсортированы по убыванию LSN.
-                # next_cursor это LSN первого (самого "нового" в текущем наборе, т.е. максимальный LSN из этой пачки) элемента.
-                output_next_cursor = items_from_db[0].lsn
+            output_next_cursor = items_from_db[-1].lsn
         else: # count == 0 (ничего не найдено)
             if cursor is not None:
                 # Если на входе был курсор и ничего не нашли, значит, достигли конца в этом направлении.
@@ -230,17 +227,9 @@ class BaseDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaTyp
                     # Возвращаем "максимально возможный" LSN.
                     output_next_cursor = MAX_LSN_FOR_EMPTY_DESC_INITIAL
 
-        # --- Подготовка `items` для ответа ---
-        # Если `direction="desc"`, результаты из БД пришли в порядке убывания LSN.
-        # Для консистентности ответа API (и удобства клиента), мы их развернем,
-        # чтобы `items` в ответе всегда были отсортированы по возрастанию LSN.
-        response_items = items_from_db
-        if direction == "desc" and count > 0:
-            logger.debug("Reversing items from DB for 'desc' direction to provide ascending order in API response.")
-            response_items.reverse()
 
         pagination_data = {
-            "items": response_items,
+            "items": items_from_db,
             "next_cursor": output_next_cursor,
             "limit": limit,
             "count": count

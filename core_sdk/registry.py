@@ -24,8 +24,8 @@ else:
 logger = logging.getLogger(__name__) # Имя будет core_sdk.registry
 
 # Типы для моделей и схем
-ModelClassType = TypeVar("ModelClassType", bound=SQLModel) # Уточненное имя
-SchemaClassType = TypeVar("SchemaClassType", bound=SQLModel) # Уточненное имя
+ModelClassType = TypeVar("ModelClassType", bound=PydanticBaseModel) # Уточненное имя
+SchemaClassType = TypeVar("SchemaClassType", bound=PydanticBaseModel) # Уточненное имя
 
 class RemoteConfig(BaseModel):
     """
@@ -39,20 +39,19 @@ class RemoteConfig(BaseModel):
     # model_config для Pydantic v2, если нужно (например, arbitrary_types_allowed)
     # model_config = ConfigDict(arbitrary_types_allowed=True)
 
-class ModelInfo(BaseModel):
-    """
-    Хранит информацию о зарегистрированной модели, включая ее классы,
-    конфигурацию доступа и класс фильтра.
-    """
+class ModelInfo(PydanticBaseModel): # Наследуем от PydanticBaseModel для ConfigDict
     model_cls: Type[SQLModel] = Field(description="Класс модели SQLModel.")
-    create_schema_cls: Type[Union[SQLModel, PydanticBaseModel]] = Field(default=None, description="Pydantic схема для создания экземпляров модели.")
-    update_schema_cls: Type[Union[SQLModel, PydanticBaseModel]] = Field(default=None, description="Pydantic схема для обновления экземпляров модели.")
-    read_schema_cls: Optional[Type[SQLModel]] = Field(default=None, description="SQLModel/Pydantic схема для чтения/сериализации экземпляров модели (если отличается от model_cls).")
-    manager_cls: Type[Any] = Field(description="Класс менеджера данных (DataAccessManager) для этой модели.") # Тип Any, т.к. может быть BaseDataAccessManager или его наследник
-    access_config: Union[RemoteConfig, Literal["local"]] = Field(description="Конфигурация доступа: 'local' или объект RemoteConfig.")
-    filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = Field(default=None, description="Класс фильтра FastAPI-Filter для этой модели.")
+    # Типы create_schema_cls и update_schema_cls теперь могут быть любыми наследниками PydanticBaseModel
+    create_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для создания.")
+    update_schema_cls: Optional[Type[SchemaClassType]] = Field(default=None, description="Pydantic схема для обновления.")
+    # read_schema_cls может быть SQLModel или PydanticBaseModel, если он используется для парсинга ответов
+    read_schema_cls: Optional[Type[PydanticBaseModel]] = Field(default=None, description="Схема для чтения/сериализации (если отличается от model_cls).")
+    manager_cls: Type[Any] = Field(description="Класс менеджера данных.")
+    access_config: Union[RemoteConfig, Literal["local"]] = Field(description="Конфигурация доступа.")
+    filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = Field(default=None, description="Класс фильтра FastAPI-Filter.")
 
-    model_config = ConfigDict(arbitrary_types_allowed=True) # Разрешаем произвольные типы (например, Type[SQLModel])
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 class ModelRegistry:
     """
@@ -72,7 +71,7 @@ class ModelRegistry:
             filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
             create_schema_cls: Optional[Type[SchemaClassType]] = None,
             update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[ModelClassType]] = None,
+            read_schema_cls: Optional[Type[PydanticBaseModel]] = None
     ) -> None:
         """
         Регистрирует модель и связанную с ней информацию в реестре.
@@ -127,7 +126,7 @@ class ModelRegistry:
             filter_cls: Optional[Type[BaseSQLAlchemyFilter]] = None,
             create_schema_cls: Optional[Type[SchemaClassType]] = None,
             update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[ModelClassType]] = None,
+            read_schema_cls: Optional[Type[PydanticBaseModel]] = None,
             model_name: Optional[str] = None
     ) -> None:
         """
@@ -174,11 +173,11 @@ class ModelRegistry:
     @classmethod
     def register_remote(
             cls,
-            model_cls: Type[ModelClassType], # Класс-представление удаленной модели (например, UserRead)
+            model_cls: Type[PydanticBaseModel], # Класс-представление удаленной модели (например, UserRead)
             config: RemoteConfig,
             create_schema_cls: Optional[Type[SchemaClassType]] = None,
             update_schema_cls: Optional[Type[SchemaClassType]] = None,
-            read_schema_cls: Optional[Type[ModelClassType]] = None, # Схема для парсинга ответа
+            read_schema_cls: Optional[Type[PydanticBaseModel]] = None, # Схема для парсинга ответа
             filter_cls: Optional[Type[ModelClassType]] = None,
             model_name: Optional[str] = None
     ) -> None:

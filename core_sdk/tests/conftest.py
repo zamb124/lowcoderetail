@@ -3,6 +3,7 @@ import asyncio
 import os
 import sys
 import importlib
+import uuid
 from typing import AsyncGenerator, Generator, Type, Dict, Any, Optional as TypingOptional, List as TypingList
 
 import pytest
@@ -28,7 +29,12 @@ logger = logging.getLogger("core_sdk.tests.conftest")
 # --- Тестовая модель и схемы (оставляем как есть) ---
 class Item(SQLModel, table=True):
     __tablename__ = "sdk_test_items" # Уникальное имя таблицы для тестов SDK
-    id: TypingOptional[int] = Field(default=None, primary_key=True)
+    id: TypingOptional[uuid.UUID] = Field(
+        default_factory=uuid.uuid4, # Генерируем UUID по умолчанию
+        primary_key=True,
+        index=True,
+        nullable=False # primary_key не может быть nullable
+    )
     name: str = Field(index=True)
     description: TypingOptional[str] = None
     value: TypingOptional[int] = None
@@ -51,9 +57,10 @@ class ItemFilter(DefaultFilter):
     name: TypingOptional[str] = None
     name__like: TypingOptional[str] = None
     value__gt: TypingOptional[int] = None
-    class Constants:
+    class Constants(DefaultFilter.Constants):
         model = Item
         search_model_fields = ["name", "description"]
+        #ordering_field_name = "lsn"
 
 # --- Фикстуры ---
 

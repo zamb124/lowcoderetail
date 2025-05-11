@@ -52,7 +52,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
         try:
             self.client = RemoteServiceClient(
                 base_url=remote_config.service_url,
-                model_endpoint = model_cls.__tablename__.lower(),
+                model_endpoint=remote_config.model_endpoint, # <--- ИСПРАВЛЕНИ
                 model_cls=self.read_schema, # Клиент будет парсить ответы в эту схему
                 auth_token=self.auth_token,
                 http_client=http_client # Используем переданный клиент
