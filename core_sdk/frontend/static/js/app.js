@@ -12,6 +12,7 @@ class App {
                 modalPlaceholder: '#modal-placeholder',
                 toastContainer: '#toast-container',
                 sidebar: '.pc-sidebar',
+                dropdownToggle: '[data-bs-toggle="dropdown"]',
                 sidebarHideToggle: '#sidebar-hide',
                 mobileCollapseToggle: '#mobile-collapse',
                 layoutSwitcherBtns: '.layout-switcher', // В хедере

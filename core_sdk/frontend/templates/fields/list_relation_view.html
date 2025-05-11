@@ -5,13 +5,16 @@
 <div class="mb-3"> {# Не используем form-floating для списка тегов/ссылок #}
     <label class="form-label fs-6 fw-semibold text-muted d-block"> {# d-block чтобы занимал всю ширину #}
         {{ field_ctx.label }}
-        {% if field_ctx.description %}
-            <i class="ti ti-info-circle ms-1 text-muted align-middle" style="cursor: help; font-size: 0.9em;"
-               data-bs-toggle="tooltip" data-bs-placement="top"
-               data-bs-container="{{ '#' ~ ctx.extra.modal_container_id if ctx and ctx.extra and ctx.extra.modal_container_id else 'body' }}"
-               title="{{ field_ctx.description | escape }}"></i>
-        {% endif %}
     </label>
+{% if field_ctx.description %}
+            <span class="form-floating-info-icon"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-container="{% if ctx and ctx.extra and ctx.extra.modal_container_id %}{{ '#' ~ ctx.extra.modal_container_id }}{% else %}body{% endif %}"
+                  title="{{ field_ctx.description | escape }}">
+        <i class="ti ti-info-circle text-muted"></i>
+    </span>
+        {% endif %}
     <div class="ps-1 mt-1">
         {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string and field_ctx.value | length > 0 %}
             {% set related_model_name = field_ctx.extra.relation_model_name %}

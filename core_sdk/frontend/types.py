@@ -6,6 +6,7 @@ class RenderMode(str, Enum):
     VIEW = "view"
     EDIT = "edit"
     CREATE = "create"
+    DELETE = "delete"
     LIST = "list"
     TABLE_CELL = "table"
     LIST_ROWS = "list_rows"

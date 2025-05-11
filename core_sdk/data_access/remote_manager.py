@@ -139,7 +139,7 @@ class RemoteDataAccessManager(Generic[ModelType, CreateSchemaType, UpdateSchemaT
                 direction=direction,
             )
             # Результат уже список объектов типа self.read_schema
-            return cast(List[ModelType], results)
+            return results
         except ServiceCommunicationError as e:
             logger.warning(
                 f"Remote DAM LIST: ServiceCommunicationError. Status: {e.status_code}. Error: {e}",

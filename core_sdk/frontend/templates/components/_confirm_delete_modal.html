@@ -1,7 +1,6 @@
 {# core_sdk/frontend/templates/components/_confirm_delete_modal.html #}
 {# Ожидает: request, ctx (RenderContext с item_id, model_name), url_for #}
 {% set modal_id = "confirm-delete-" ~ ctx.model_name ~ "-" ~ ctx.item_id %}
-{% extends "components/_modal_wrapper.html" %}
 
 {% block modal_size %}modal-md{% endblock %}
 

@@ -48,6 +48,17 @@ async def get_view_mode_renderer(
         request, model_name, dam_factory, user, item_id, RenderMode.VIEW
     )
 
+async def get_delete_mode_renderer(
+    request: Request,
+    model_name: str = FastAPIPath(...),
+    item_id: uuid.UUID = FastAPIPath(...),
+    dam_factory: DataAccessManagerFactory = Depends(get_dam_factory),
+    user: Optional[AuthenticatedUser] = Depends(get_optional_current_user),
+) -> ViewRenderer:
+    return await get_renderer(
+        request, model_name, dam_factory, user, item_id, RenderMode.DELETE
+    )
+
 
 async def get_edit_form_renderer(
     request: Request,

@@ -71,7 +71,7 @@
                     Отмена
                 </button>
             {% else %} {# Режим CREATE на отдельной странице #}
-                <a href="{{ url_for('get_list_view', model_name=ctx.model_name).replace('/sdk','') }}" class="btn btn-light me-3">
+                <a href="{{ url_for('get_list_view', model_name=ctx.model_name) }}" class="btn btn-light me-3">
                     Отмена
                 </a>
             {% endif %}

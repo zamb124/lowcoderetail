@@ -26,7 +26,7 @@ from core_sdk.frontend.dependencies import (
     get_list_rows_renderer,
     get_table_cell_renderer,
     get_inline_edit_field_renderer,
-    get_filter_form_renderer,
+    get_filter_form_renderer, get_delete_mode_renderer,
 )
 
 # Убираем FallbackFormDataModel из импортов renderer
@@ -164,6 +164,12 @@ async def get_edit_form_content(
 ):
     return await renderer.render_to_response()
 
+@router.get(
+    "/view/delete/{model_name}/{item_id}", response_class=HTMLResponse, name="get_delete_view"
+)
+async def get_delete_content(renderer: ViewRenderer = Depends(get_delete_mode_renderer)):
+    return await renderer.render_to_response()
+
 
 @router.get(
     "/form/create/{model_name}", response_class=HTMLResponse, name="get_create_form"
@@ -214,7 +220,7 @@ async def create_item(
     except HTTPException as e:
         form_renderer.errors = e.detail
         target_schema_cls = form_renderer._get_schema_for_mode()
-        instance_with_user_data = target_schema_cls()  # Создаем пустой экземпляр
+        instance_with_user_data = target_schema_cls(**json_data)  # Создаем пустой экземпляр
         for key, value in json_data.items():  # Заполняем его данными пользователя
             if hasattr(instance_with_user_data, key):
                 setattr(instance_with_user_data, key, value)
@@ -393,8 +399,7 @@ async def get_select_options(
     elif q:
         filters["search"] = q
     try:
-        results_dict = await manager.list(limit=options_limit, filters=filters)
-        items = results_dict.get("items", [])
+        items = await manager.list(limit=options_limit, filters=filters)
         options_list = []
         for item in items:
             item_id_val = getattr(item, "id", None)
@@ -413,7 +418,7 @@ async def get_select_options(
         from fastapi.responses import JSONResponse
 
         return JSONResponse(content=options_list)
-    except Exception:
+    except Exception as e:
         raise HTTPException(status_code=500)
 
 
@@ -567,37 +572,3 @@ async def get_filter_form_content(
     renderer: ViewRenderer = Depends(get_filter_form_renderer),
 ):
     return await renderer.render_to_response()
-
-
-@router.get(
-    "/confirm-delete/{model_name}/{item_id}",
-    response_class=HTMLResponse,
-    name="get_confirm_delete_modal",
-)
-async def get_confirm_delete_modal_content(
-    request: Request, renderer: ViewRenderer = Depends(get_view_mode_renderer)
-):
-    templates = get_templates()
-    # ctx для _confirm_delete_modal.html ожидает model_name, item_id, html_id
-    # html_id для модалки генерируем здесь, так как ViewRenderer для этого не используется
-    modal_actual_id = f"modal-delete-{renderer.model_name}-{renderer.item_id}"
-    render_ctx_for_modal = {
-        "model_name": renderer.model_name,
-        "item_id": renderer.item_id,
-        "html_id": modal_actual_id,
-    }
-
-    context_dict = {
-        "request": request,
-        "user": renderer.user,
-        "SDK_STATIC_URL": STATIC_URL_PATH,
-        "url_for": request.url_for,
-        "ctx": render_ctx_for_modal,  # Передаем только то, что нужно шаблону
-        "modal_id": modal_actual_id,  # Передаем modal_id для _modal_wrapper, если он используется как базовый
-    }
-    # _confirm_delete_modal.html сам является полной модалкой, наследуя _modal_wrapper.html
-    # Поэтому ему нужен modal_id, modal_title и т.д.
-    # Ручка get_modal_wrapper здесь не используется.
-    return templates.TemplateResponse(
-        "components/_confirm_delete_modal.html", context_dict
-    )

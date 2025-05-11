@@ -233,14 +233,13 @@ class ViewRenderer:
             direction = self.query_params.get("direction", "asc")
             if direction not in ["asc", "desc"]:
                 direction = "asc"
-            result_dict = await self.manager.list(
+            self.items = await self.manager.list(
                 cursor=cursor, limit=limit, filters=dam_filters, direction=direction
             )
-            self.items = result_dict.get("items", [])
             self.pagination = {
-                "next_cursor": result_dict.get("next_cursor"),
-                "limit": result_dict.get("limit", limit),
-                "count": result_dict.get("count", len(self.items) if self.items else 0),
+                "next_cursor": self.items[-1].lsn if self.items else None,
+                "limit": limit,
+                "count": len(self.items),
                 "direction": direction,
             }
         logger.debug(
@@ -507,6 +506,7 @@ class ViewRenderer:
             RenderMode.VIEW: "components/view.html",
             RenderMode.EDIT: "components/form.html",
             RenderMode.CREATE: "components/form.html",
+            RenderMode.DELETE: "components/_confirm_delete_modal.html",
             RenderMode.LIST: "components/table.html",
             RenderMode.LIST_ROWS: "components/_table_rows_fragment.html",
             RenderMode.TABLE_CELL: (

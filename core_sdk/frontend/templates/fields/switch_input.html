@@ -6,7 +6,8 @@
 {# d-flex align-items-center - для вертикального центрирования содержимого этого div. #}
 {# Если этот div должен занимать всю высоту ячейки таблицы или другого контейнера, #}
 {# то этому контейнеру может понадобиться height: 100% и display: flex. #}
-<div class="mb-3 d-flex align-items-center" style="min-height: calc(1.5em + 0.75rem + 2px);"> {# Минимальная высота как у form-control #}
+<div class="mb-3 d-flex align-items-center" style="min-height: calc(1.5em + 0.75rem + 2px);">
+    {# Минимальная высота как у form-control #}
 
     {# Сам свитчер с его лейблом #}
     <div class="form-check form-switch form-check-custom form-check-solid">
@@ -20,17 +21,19 @@
                aria-describedby="{{ field_ctx.html_id }}_errors"
         />
         {# Лейбл для свитчера. Иконка информации теперь внутри него. #}
-        <label class="form-check-label fw-semibold ps-2" for="{{ field_ctx.html_id }}"> {# Добавлен ps-2 для отступа от свитчера #}
+        <label class="form-check-label fw-semibold ps-2" for="{{ field_ctx.html_id }}">
+            {# Добавлен ps-2 для отступа от свитчера #}
             {{ field_ctx.label }}
             {% if field_ctx.is_required %}<span class="text-danger">*</span>{% endif %}
             {% if field_ctx.description %}
-                <i class="ti ti-info-circle ms-1 text-muted align-middle"
-                   style="cursor: help; font-size: 0.9em; vertical-align: baseline;" {# baseline может быть лучше #}
-                   data-bs-toggle="tooltip"
-                   data-bs-placement="top"
-                   data-bs-container="{{ '#' ~ ctx.extra.modal_container_id if ctx and ctx.extra and ctx.extra.modal_container_id else 'body' }}"
-                   title="{{ field_ctx.description | escape }}"></i>
-            {% endif %}
+            <span class="form-floating-info-icon"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-container="{% if ctx and ctx.extra and ctx.extra.modal_container_id %}{{ '#' ~ ctx.extra.modal_container_id }}{% else %}body{% endif %}"
+                  title="{{ field_ctx.description | escape }}">
+        <i class="ti ti-info-circle text-muted"></i>
+    </span>
+        {% endif %}
         </label>
     </div>
 

@@ -54,8 +54,8 @@ DEFAULT_FIELD_TEMPLATES: Dict[str, Dict[str, str]] = {
     },
     "number": {
         "view": "fields/text_view.html",  # Можно использовать тот же, что и для text
-        "edit": "fields/number_input.html",
-        "create": "fields/number_input.html",
+        "edit": "fields/text_input.html",
+        "create": "fields/text_input.html",
         "table": "fields/text_table.html",
     },
     "switch": {  # <--- НОВЫЙ/ОБНОВЛЕННЫЙ ТИП

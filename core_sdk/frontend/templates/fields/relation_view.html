@@ -25,9 +25,13 @@
     </div>
     <label for="{{ field_ctx.html_id }}-view-val" class="text-muted">{{ field_ctx.label }}
     {% if field_ctx.description %}
-            <i class="ti ti-info-circle ms-1 text-muted" style="cursor: help; font-size: 0.9em;"
-               data-bs-toggle="tooltip" data-bs-placement="top"
-               title="{{ field_ctx.description | escape }}"></i>
-        {% endif %}</label>
+            <span class="form-floating-info-icon"
+                  data-bs-toggle="tooltip"
+                  data-bs-placement="top"
+                  data-bs-container="{% if ctx and ctx.extra and ctx.extra.modal_container_id %}{{ '#' ~ ctx.extra.modal_container_id }}{% else %}body{% endif %}"
+                  title="{{ field_ctx.description | escape }}">
+        <i class="ti ti-info-circle text-muted"></i>
+    </span>
+        {% endif %}
 
 </div>
