@@ -90,6 +90,20 @@
     <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/bootstrap.min.js"></script>
     <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/feather.min.js"></script>
     <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/theme.js"></script> {# Возможно, theme.js не нужен на странице логина #}
+    <!-- Required Js -->
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/popper.min.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/bootstrap.min.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/fonts/custom-font.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/datta-able/assets/js/plugins/feather.min.js"></script>
+
+    {# --- Основной JS SDK --- #}
+    <script src="{{ SDK_STATIC_URL }}/js/notificationService.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/componentInitializer.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/themeManager.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/htmxManager.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/webSocketManager.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/titleResolver.js"></script>
+    <script src="{{ SDK_STATIC_URL }}/js/app.js"></script>
     <script>feather.replace();</script> {# Инициализация иконок #}
 </body>
 </html>

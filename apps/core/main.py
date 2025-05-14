@@ -1,7 +1,7 @@
 # core/app/main.py
 import logging
 import os
-
+from core_sdk.registry import ModelRegistry # TODO: надо понять как  обойти этот импорт мб в конфиг перенести(
 # Импортируем фабрику создания приложения из SDK
 from core_sdk.app_setup import create_app_with_sdk_setup
 
@@ -11,7 +11,7 @@ from .config import settings
 # --- ИМПОРТИРУЕМ СХЕМЫ ДЛЯ REBUILD ---
 from . import schemas as app_schemas
 # ------------------------------------
-
+from . import registry_config # noqa F401
 # Импорты роутеров API
 from .api.endpoints import (
     auth,

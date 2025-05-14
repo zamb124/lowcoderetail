@@ -1,178 +1,139 @@
 # core_sdk/data_access/manager_factory.py
 import logging
-from typing import Type, Optional, Any, Dict
+from typing import Type, Optional, Any, Dict, TYPE_CHECKING
 
-from fastapi import Depends  # Depends используется для get_dam_factory
-import httpx  # httpx.AsyncClient используется для type hinting
-from starlette.requests import Request
+from fastapi import Depends
+import httpx
+from sqlmodel import SQLModel
+from starlette.requests import Request as StarletteRequest
+# FastAPIRequest не используется напрямую, но оставлю для TYPE_CHECKING, если понадобится
 from fastapi import Request as FastAPIRequest
-from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
-from core_sdk.data_access.base_manager import BaseDataAccessManager
+
+# --- ИЗМЕНЕНИЕ ИМПОРТОВ ---
+from core_sdk.data_access.base_manager import BaseDataAccessManager # Теперь это интерфейс
+from core_sdk.data_access.local_manager import LocalDataAccessManager
 from core_sdk.data_access.remote_manager import RemoteDataAccessManager
+# --------------------------
 from core_sdk.data_access.common import get_optional_token, get_global_http_client
 from core_sdk.exceptions import ConfigurationError
+from pydantic import BaseModel # Для type hinting схем
 
-logger = logging.getLogger(__name__)  # Имя будет core_sdk.data_access.manager_factory
+if TYPE_CHECKING:
+    from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
 
+logger = logging.getLogger("core_sdk.data_access.manager_factory")
 
 class DataAccessManagerFactory:
     def __init__(
         self,
-        http_client: Optional[httpx.AsyncClient] = None,  # httpx импортируется в тестах
+        http_client: Optional[httpx.AsyncClient] = None,
         auth_token: Optional[str] = None,
-        registry: Type[ModelRegistry] = ModelRegistry,
+        registry: Optional[Any] = None, # Используем Any для аргумента, чтобы не импортировать ModelRegistry здесь
     ):
-        if not registry.is_configured():
+        from core_sdk.registry import ModelRegistry as ActualModelRegistry # Импорт внутри __init__
+        self.registry: Type[ActualModelRegistry] = registry or ActualModelRegistry # Указываем тип здесь
+
+        if not self.registry.is_configured():
             raise ConfigurationError("ModelRegistry has not been configured.")
         self.http_client = http_client
-        self.auth_token = auth_token  # Токен по умолчанию для фабрики
-        self.registry = registry
-        self._manager_cache: Dict[str, Any] = {}  # Ключ будет model_name.lower()
-        logger.debug(
-            f"DataAccessManagerFactory initialized. HTTP client: {http_client is not None}, Factory auth_token: {auth_token is not None}"
-        )
+        self.auth_token = auth_token
+        self._manager_cache: Dict[str, BaseDataAccessManager] = {}
+        logger.debug(f"DataAccessManagerFactory initialized. HTTP client: {http_client is not None}, Factory auth_token: {auth_token is not None}")
 
     def get_manager(
-        self, model_name: str, request: Optional[FastAPIRequest] = None
-    ) -> Any:
-        # Используем имя в нижнем регистре для ключа кэша и для запроса в ModelRegistry
+        self, model_name: str, request: Optional[StarletteRequest] = None
+    ) -> BaseDataAccessManager[Any, Any, Any]:
         normalized_model_name = model_name.lower()
 
+        # Логика кэширования и обновления токена для RemoteManager
         if normalized_model_name in self._manager_cache:
-            # ВАЖНО: Если кэшируем RemoteManager, нужно учитывать, что токен мог измениться.
-            # Текущий простой кэш этого не делает. Для RemoteManager с request-specific токеном
-            # кэширование может быть нежелательно или ключ кэша должен включать токен.
-            # Пока оставляем простой кэш.
             cached_manager = self._manager_cache[normalized_model_name]
-            logger.debug(
-                f"Returning cached DAM instance for model '{normalized_model_name}'. Type: {type(cached_manager)}"
-            )
-            # Если это RemoteManager и передан request, возможно, нужно обновить его токен
             if isinstance(cached_manager, RemoteDataAccessManager) and request:
-                token_from_request = request.headers.get(
-                    "Authorization"
-                ) or request.cookies.get("Authorization")
-                if token_from_request:  # Если в request есть токен
-                    cached_manager.auth_token = token_from_request
-                    if (
-                        hasattr(cached_manager, "client") and cached_manager.client
-                    ):  # Обновляем токен и в клиенте
-                        cached_manager.client.auth_token = token_from_request
-                elif self.auth_token:  # Если в request нет, но есть в фабрике
-                    cached_manager.auth_token = self.auth_token
-                    if hasattr(cached_manager, "client") and cached_manager.client:
-                        cached_manager.client.auth_token = self.auth_token
-                else:  # Токена нет нигде
-                    cached_manager.auth_token = None
-                    if hasattr(cached_manager, "client") and cached_manager.client:
-                        cached_manager.client.auth_token = None
+                # Попытка получить токен из запроса
+                token_from_request_header = request.headers.get("Authorization")
+                token_from_request_cookie = request.cookies.get("Authorization")
+                token_from_request = token_from_request_header or token_from_request_cookie
 
+                new_auth_token = token_from_request if token_from_request else self.auth_token
+
+                # Обновляем токен, только если он действительно изменился
+                if cached_manager.auth_token != new_auth_token:
+                    logger.debug(f"Updating auth token for cached RemoteManager '{model_name}' from '{cached_manager.auth_token}' to '{new_auth_token}'")
+                    cached_manager.auth_token = new_auth_token
+                    if hasattr(cached_manager, "client") and cached_manager.client:
+                        cached_manager.client.auth_token = new_auth_token
             return cached_manager
 
-        logger.debug(
-            f"Attempting to create new DAM instance for normalized_model_name '{normalized_model_name}' (original: '{model_name}')."
-        )
-        try:
-            # ModelRegistry.get_model_info уже использует model_name.lower()
-            model_info = self.registry.get_model_info(
-                model_name
-            )  # Передаем оригинальное имя, т.к. get_model_info его нормализует
-        except ConfigurationError:
-            logger.error(
-                f"Failed to get ModelInfo for '{model_name}' (normalized: '{normalized_model_name}') from registry."
-            )
-            raise  # Перебрасываем ошибку конфигурации (сообщение будет с оригинальным model_name)
+        model_info = self.registry.get_model_info(model_name) # Используем self.registry
+        manager_instance: BaseDataAccessManager[Any, Any, Any]
 
-        manager_instance: Any = None
-        access_config = model_info.access_config
+        effective_read_schema_cls = model_info.read_schema_cls or model_info.model_cls
 
-        # model_name, передаваемый в конструктор менеджера, должен быть тем, под которым он зарегистрирован (normalized)
-        # или тем, по которому его запросили (original), для консистентности.
-        # BaseDataAccessManager сохраняет его как self.model_name.
-        # Давайте передавать оригинальное имя model_name, чтобы manager.model_name был предсказуем.
-        manager_init_model_name = model_name
+        if model_info.access_config == "local":
+            ManagerClass = model_info.manager_cls
+            if ManagerClass is None or ManagerClass is Any: # type: ignore
+                ManagerClass = LocalDataAccessManager
 
-        if access_config == "local":
-            manager_cls = model_info.manager_cls
-            if (
-                manager_cls is None or manager_cls is Any
-            ):  # Any может прийти от register_remote
-                manager_cls = BaseDataAccessManager
-            if not issubclass(manager_cls, BaseDataAccessManager):
-                raise TypeError(
-                    f"Registered manager_cls for '{manager_init_model_name}' is not a subclass of BaseDataAccessManager, got {manager_cls}"
+            # --- РАСКОММЕНТИРОВАТЬ И, ВОЗМОЖНО, УТОЧНИТЬ ПРОВЕРКУ ---
+            # Проверяем, что ManagerClass является подклассом BaseDataAccessManager
+            # или LocalDataAccessManager (если ManagerClass это LocalDataAccessManager по умолчанию)
+            if model_info.access_config == "local":
+                ManagerClass = model_info.manager_cls
+                if ManagerClass is None or ManagerClass is Any: # type: ignore
+                    ManagerClass = LocalDataAccessManager # По умолчанию LocalDataAccessManager
+
+                # --- УСИЛЕННАЯ ПРОВЕРКА ---
+                if not issubclass(ManagerClass, LocalDataAccessManager):
+                    # Если это не так, но это BaseDataAccessManager, это тоже странно для локального
+                    if issubclass(ManagerClass, BaseDataAccessManager):
+                        logger.warning(f"Registered local manager_cls for '{model_name}' ('{ManagerClass.__name__}') is BaseDataAccessManager, expected LocalDataAccessManager or subclass. This might lead to issues.")
+                        # Можно здесь тоже выбросить ошибку, если это недопустимо
+                        # raise TypeError(f"Registered local manager_cls for '{model_name}' ('{ManagerClass.__name__}') should be a subclass of LocalDataAccessManager, not BaseDataAccessManager directly.")
+                    else:
+                        raise TypeError(f"Registered local manager_cls for '{model_name}' ('{ManagerClass.__name__}') is not a subclass of LocalDataAccessManager.")
+                # -------------------------
+
+                logger.info(f"Instantiating LOCAL manager: {ManagerClass.__name__} for model '{model_name}'.")
+                if not issubclass(model_info.model_cls, SQLModel):
+                    raise ConfigurationError(f"Local manager for '{model_name}' requires model_cls to be SQLModel, got {model_info.model_cls}")
+
+                manager_instance = ManagerClass(
+                    model_name=model_name,
+                    model_cls=model_info.model_cls,
+                    read_schema_cls=effective_read_schema_cls,
+                    create_schema_cls=model_info.create_schema_cls,
+                    update_schema_cls=model_info.update_schema_cls,
                 )
-
-            logger.info(
-                f"Instantiating LOCAL manager: {manager_cls.__name__} for model '{manager_init_model_name}'."
-            )
-            manager_instance = manager_cls(
-                model_name=manager_init_model_name, http_client=self.http_client
-            )
-
-            if not getattr(manager_instance, "model", None):
-                manager_instance.model = model_info.model_cls
-            if not getattr(manager_instance, "create_schema", None):
-                manager_instance.create_schema = model_info.create_schema_cls
-            if not getattr(manager_instance, "update_schema", None):
-                manager_instance.update_schema = model_info.update_schema_cls
-
-        elif isinstance(access_config, RemoteConfig):
+        elif isinstance(model_info.access_config, BaseModel): # Проверяем, что это Pydantic модель (RemoteConfig)
             if self.http_client is None:
-                # Используем manager_init_model_name (оригинальное имя) в сообщении об ошибке для пользователя
-                raise ConfigurationError(
-                    f"HTTP client required for remote manager '{manager_init_model_name}'."
-                )
+                raise ConfigurationError(f"HTTP client required for remote manager '{model_name}'.")
 
-            token_for_remote = None
+            token_for_remote = self.auth_token
             if request:
-                token_from_request = request.headers.get(
-                    "Authorization"
-                ) or request.cookies.get("Authorization")
-                if token_from_request:
-                    token_for_remote = token_from_request
+                token_from_request_header = request.headers.get("Authorization")
+                token_from_request_cookie = request.cookies.get("Authorization")
+                token_from_request = token_from_request_header or token_from_request_cookie
+                if token_from_request: token_for_remote = token_from_request
 
-            if (
-                token_for_remote is None
-            ):  # Если из request не получили, берем из фабрики
-                token_for_remote = self.auth_token
-
-            logger.info(
-                f"Instantiating REMOTE manager for model '{manager_init_model_name}'. Token used: {'Provided' if token_for_remote else 'None'}"
-            )
+            logger.info(f"Instantiating REMOTE manager for model '{model_name}'. Token used: {'Provided' if token_for_remote else 'None'}")
             manager_instance = RemoteDataAccessManager(
-                remote_config=access_config,
+                model_name=model_name,
+                model_cls=effective_read_schema_cls,
+                remote_config=model_info.access_config, # model_info.access_config уже будет RemoteConfig
                 http_client=self.http_client,
                 auth_token=token_for_remote,
-                model_cls=model_info.model_cls,
                 create_schema_cls=model_info.create_schema_cls,
                 update_schema_cls=model_info.update_schema_cls,
-                read_schema_cls=model_info.read_schema_cls,
             )
         else:
-            raise ConfigurationError(
-                f"Invalid access config type for '{manager_init_model_name}': {type(access_config)}"
-            )
+            raise ConfigurationError(f"Invalid access config type for '{model_name}': {type(model_info.access_config)}")
 
         self._manager_cache[normalized_model_name] = manager_instance
-        logger.debug(
-            f"Successfully created and cached DAM instance for model '{normalized_model_name}' (original: '{model_name}')."
-        )
         return manager_instance
-
 
 def get_dam_factory(
     http_client: Optional[httpx.AsyncClient] = Depends(get_global_http_client),
     auth_token: Optional[str] = Depends(get_optional_token),
 ) -> DataAccessManagerFactory:
-    """
-    FastAPI dependency that provides an instance of DataAccessManagerFactory.
-    The factory is configured with the global HTTP client and an optional auth token
-    extracted from the request.
-    """
-    logger.debug("FastAPI dependency 'get_dam_factory' called.")
-    return DataAccessManagerFactory(
-        http_client=http_client,
-        auth_token=auth_token,
-        registry=ModelRegistry,  # Используем глобальный ModelRegistry
-    )
+    from core_sdk.registry import ModelRegistry as GlobalModelRegistry # Импорт здесь
+    return DataAccessManagerFactory(http_client=http_client, auth_token=auth_token, registry=GlobalModelRegistry)

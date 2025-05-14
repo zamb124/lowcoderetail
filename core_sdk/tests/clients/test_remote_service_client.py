@@ -138,10 +138,10 @@ async def test_list_success(
 
     result_list_of_models = await service_client.list(limit=2)
 
-    assert isinstance(result_list_of_models, list)
-    assert len(result_list_of_models) == 2
-    assert isinstance(result_list_of_models[0], TestItemModel)
-    assert result_list_of_models[0].name == "Item 1"
+    assert isinstance(result_list_of_models['items'], list)
+    assert len(result_list_of_models['items']) == 2
+    assert isinstance(result_list_of_models['items'][0], TestItemModel)
+    assert result_list_of_models['items'][0].name == "Item 1"
 
 
 async def test_list_api_returns_direct_list(
@@ -153,8 +153,8 @@ async def test_list_api_returns_direct_list(
     )  # API возвращает просто список
 
     result_list_of_models = await service_client.list()
-    assert len(result_list_of_models) == 1
-    assert result_list_of_models[0].name == "Direct List Item"
+    assert len(result_list_of_models['items']) == 1
+    assert result_list_of_models['items'][0].name == "Direct List Item"
 
 
 async def test_list_params_are_sent(

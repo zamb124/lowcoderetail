@@ -55,7 +55,7 @@ async def app_http_client_lifespan(app: FastAPI):  # Принимает app
     except Exception as e:
         logger.critical("SDK: Failed to initialize HTTP client.", exc_info=True)
         # Можно выбросить ошибку, чтобы остановить старт, если клиент критичен
-        # raise RuntimeError("Failed to initialize HTTP client") from e
+        raise RuntimeError("Failed to initialize HTTP client") from e
     finally:
         if client:  # Используем локальную переменную client
             logger.info("SDK: Closing HTTP client from app.state...")

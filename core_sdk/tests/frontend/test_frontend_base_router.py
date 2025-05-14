@@ -333,3 +333,206 @@ def test_get_confirm_delete_modal(client: TestClient, mock_view_renderer_instanc
     assert "Вы уверены, что хотите удалить" in html
 
     del app_with_frontend_router.dependency_overrides[get_view_mode_renderer]
+
+    # --- Новые тесты ---
+
+    async def test_get_edit_form_content_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        item_id_for_test = uuid.uuid4()
+        async def _get_mock_renderer(): return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_edit_form_renderer] = _get_mock_renderer
+        response = client.get(f"/sdk/form/edit/Item/{item_id_for_test}")
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked Generic Render Output</div>"
+        mock_generic_renderer_instance.render_to_response.assert_awaited_once()
+        del app_with_frontend_router.dependency_overrides[get_edit_form_renderer]
+
+    async def test_get_create_form_content_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        async def _get_mock_renderer(): return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_create_form_renderer] = _get_mock_renderer
+        response = client.get("/sdk/form/create/Item")
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked Generic Render Output</div>"
+        mock_generic_renderer_instance.render_to_response.assert_awaited_once()
+        del app_with_frontend_router.dependency_overrides[get_create_form_renderer]
+
+    async def test_get_list_view_content_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        async def _get_mock_renderer(): return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_list_mode_renderer] = _get_mock_renderer
+        response = client.get("/sdk/list/Item")
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked Generic Render Output</div>"
+        mock_generic_renderer_instance.render_to_response.assert_awaited_once()
+        del app_with_frontend_router.dependency_overrides[get_list_mode_renderer]
+
+    async def test_update_item_success(
+            client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock,
+            app_with_frontend_router: FastAPI, mock_templates_response_method: mock.Mock
+    ):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id = uuid.uuid4()
+        update_data = {"name": "Updated Item", "description": "Updated desc"}
+        updated_item_model = MockItemRead(id=item_id, name=update_data["name"], description=update_data["description"], lsn=2)
+        mock_dam_instance.update.return_value = updated_item_model
+
+        response = client.put(f"/sdk/item/Item/{item_id}", json=update_data)
+
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked TemplateResponse HTML</div>"
+        mock_dam_instance.update.assert_awaited_once()
+        # Проверяем, что ViewRenderer для VIEW mode был вызван для генерации ответа
+        mock_templates_response_method.assert_called_once()
+        template_name, context, status_code_kw = mock_templates_response_method.call_args[0][0], mock_templates_response_method.call_args[0][1], mock_templates_response_method.call_args[1].get('status_code')
+        assert template_name == "components/view.html"
+        assert status_code_kw == 200
+        assert context["ctx"].item.name == update_data["name"]
+
+    async def test_update_item_validation_error(
+            client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock,
+            app_with_frontend_router: FastAPI, mock_templates_response_method: mock.Mock
+    ):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id = uuid.uuid4()
+        update_data = {"name": "U"} # Невалидные данные
+        validation_errors = [{"loc": ("body", "name"), "msg": "Too short", "type": "value_error"}]
+        mock_dam_instance.update.side_effect = FastAPIHTTPException(status_code=422, detail=validation_errors)
+        # Мокируем get, чтобы form_renderer._load_data() мог "загрузить" исходный элемент
+        mock_dam_instance.get.return_value = MockItemRead(id=item_id, name="Original", lsn=1)
+
+
+        response = client.put(f"/sdk/item/Item/{item_id}", json=update_data)
+
+        assert response.status_code == 422
+        assert response.text == "<div>Mocked TemplateResponse HTML</div>"
+        mock_templates_response_method.assert_called_once()
+        template_name, context, status_code_kw = mock_templates_response_method.call_args[0][0], mock_templates_response_method.call_args[0][1], mock_templates_response_method.call_args[1].get('status_code')
+
+        assert template_name == "components/form.html"
+        assert status_code_kw == 422
+        assert context["ctx"].errors == validation_errors
+        assert context["ctx"].item.name == "U" # Данные пользователя должны быть в форме
+
+    async def test_update_item_not_found(
+            client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock,
+            app_with_frontend_router: FastAPI
+    ):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id = uuid.uuid4()
+        update_data = {"name": "Updated Item"}
+        mock_dam_instance.update.side_effect = FastAPIHTTPException(status_code=404, detail="Item not found")
+
+        response = client.put(f"/sdk/item/Item/{item_id}", json=update_data)
+        assert response.status_code == 404
+
+    async def test_delete_item_success(client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id = uuid.uuid4()
+        mock_dam_instance.delete.return_value = True
+        # Мокируем get, чтобы get_delete_mode_renderer мог "загрузить" элемент
+        mock_dam_instance.get.return_value = MockItemRead(id=item_id, name="To Delete", lsn=1)
+
+        response = client.delete(f"/sdk/item/Item/{item_id}")
+        assert response.status_code == 204
+        assert "HX-Trigger" in response.headers
+        assert "itemDeleted" in response.headers["HX-Trigger"]
+        assert "closeModal" in response.headers["HX-Trigger"]
+        mock_dam_instance.delete.assert_awaited_once_with(item_id)
+
+    async def test_delete_item_not_found(client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id = uuid.uuid4()
+        mock_dam_instance.delete.side_effect = FastAPIHTTPException(status_code=404, detail="Not Found")
+        mock_dam_instance.get.return_value = None # Для get_delete_mode_renderer
+
+        response = client.delete(f"/sdk/item/Item/{item_id}")
+        assert response.status_code == 404
+
+    async def test_get_inline_edit_field_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        item_id, field_name = uuid.uuid4(), "name"
+        async def _get_mock_renderer():
+            mock_generic_renderer_instance.field_to_focus = field_name
+            return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_inline_edit_field_renderer] = _get_mock_renderer
+        response = client.get(f"/sdk/edit-field/Item/{item_id}/{field_name}")
+        assert response.status_code == 200
+        assert response.text == "<span>Mocked Generic Field Output</span>"
+        mock_generic_renderer_instance.render_field_to_response.assert_awaited_once_with(field_name)
+        del app_with_frontend_router.dependency_overrides[get_inline_edit_field_renderer]
+
+    async def test_update_inline_field_success(
+            client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock,
+            app_with_frontend_router: FastAPI, mock_templates_response_method: mock.Mock
+    ):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id, field_name = uuid.uuid4(), "name"
+        new_value = "Inline Updated Name"
+        payload = {field_name: new_value}
+        updated_item_model = MockItemRead(id=item_id, name=new_value, lsn=3)
+        mock_dam_instance.update.return_value = updated_item_model
+        # Мокируем get для ViewRenderer, который создается для рендера ячейки
+        mock_dam_instance.get.return_value = updated_item_model
+
+        response = client.put(f"/sdk/edit-field/Item/{item_id}/{field_name}", json=payload)
+
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked TemplateResponse HTML</div>"
+        mock_dam_instance.update.assert_awaited_once_with(item_id, {field_name: new_value})
+        mock_templates_response_method.assert_called_once()
+        template_name, context, _ = mock_templates_response_method.call_args[0]
+        assert template_name == "fields/text_table.html" # Ожидаем шаблон ячейки
+        assert context["field_ctx"].name == field_name
+        assert context["field_ctx"].value == new_value
+
+    async def test_update_inline_field_validation_error(
+            client: TestClient, mock_dam_factory_fixture: mock.Mock, mock_dam_instance: mock.AsyncMock,
+            app_with_frontend_router: FastAPI, mock_templates_response_method: mock.Mock
+    ):
+        mock_dam_factory_fixture.get_manager.return_value = mock_dam_instance
+        item_id, field_name = uuid.uuid4(), "value" # Предположим, value - int
+        invalid_value = "not-a-number"
+        payload = {field_name: invalid_value}
+
+        # Мокируем get для error_renderer._load_data()
+        mock_dam_instance.get.return_value = MockItemRead(id=item_id, name="Original", value=10, lsn=1)
+
+        response = client.put(f"/sdk/edit-field/Item/{item_id}/{field_name}", json=payload)
+        assert response.status_code == 422
+        assert response.text == "<div>Mocked TemplateResponse HTML</div>"
+        mock_templates_response_method.assert_called_once()
+        template_name, context, status_code_kw = mock_templates_response_method.call_args[0][0], mock_templates_response_method.call_args[0][1], mock_templates_response_method.call_args[1].get('status_code')
+
+        assert template_name == "fields/_inline_input_wrapper.html"
+        assert status_code_kw == 422
+        assert context["field_ctx"].name == field_name
+        assert context["field_ctx"].value == invalid_value # Значение из формы
+        assert context["field_ctx"].errors is not None
+        assert "Input should be a valid integer" in context["field_ctx"].errors[0] # Пример сообщения от Pydantic
+
+    async def test_get_table_cell_view_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        item_id, field_name = uuid.uuid4(), "description"
+        async def _get_mock_renderer():
+            mock_generic_renderer_instance.field_to_focus = field_name
+            return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_table_cell_renderer] = _get_mock_renderer
+        response = client.get(f"/sdk/view-field/Item/{item_id}/{field_name}")
+        assert response.status_code == 200
+        assert response.text == "<span>Mocked Generic Field Output</span>"
+        mock_generic_renderer_instance.render_field_to_response.assert_awaited_once_with(field_name)
+        del app_with_frontend_router.dependency_overrides[get_table_cell_renderer]
+
+    async def test_get_list_rows_content_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        async def _get_mock_renderer(): return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_list_rows_renderer] = _get_mock_renderer
+        response = client.get("/sdk/list-rows/Item")
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked Generic Render Output</div>" # render_to_response
+        mock_generic_renderer_instance.render_to_response.assert_awaited_once()
+        del app_with_frontend_router.dependency_overrides[get_list_rows_renderer]
+
+    async def test_get_filter_form_content_calls_renderer(client: TestClient, mock_generic_renderer_instance: mock.AsyncMock, app_with_frontend_router: FastAPI):
+        async def _get_mock_renderer(): return mock_generic_renderer_instance
+        app_with_frontend_router.dependency_overrides[get_filter_form_renderer] = _get_mock_renderer
+        response = client.get("/sdk/filter/Item")
+        assert response.status_code == 200
+        assert response.text == "<div>Mocked Generic Render Output</div>"
+        mock_generic_renderer_instance.render_to_response.assert_awaited_once()
+        del app_with_frontend_router.dependency_overrides[get_filter_form_renderer]

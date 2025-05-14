@@ -3,7 +3,7 @@ import functools
 import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, List, Type
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from core_sdk.broker.setup import broker
 from core_sdk.broker.tasks import execute_dam_operation
@@ -12,15 +12,13 @@ from taskiq import TaskiqResult, TaskiqError, TaskiqResultTimeoutError
 
 if TYPE_CHECKING:
     from core_sdk.data_access.base_manager import BaseDataAccessManager
-    from taskiq import (
-        AsyncTaskiqDecoratedTask,
-    )  # Оставляем, т.к. TaskiqResult может его содержать
+    from taskiq import AsyncTaskiqDecoratedTask
 
-logger = logging.getLogger(__name__)  # Имя будет core_sdk.data_access.broker_proxy
+logger = logging.getLogger(__name__)
 
 
 def _serialize_arg(arg: Any) -> Any:
-    """Преобразует аргумент в JSON-совместимый формат для передачи через брокер."""
+    # ... (без изменений) ...
     if isinstance(arg, BaseModel):
         return arg.model_dump(mode="json")
     elif isinstance(arg, UUID):
@@ -59,13 +57,6 @@ def _deserialize_broker_result(data: Any, dam_instance: "BaseDataAccessManager")
 
 
 class BrokerTaskProxy:
-    """
-    Динамический прокси для отправки операций DataAccessManager (DAM) в Taskiq.
-    Перехватывает вызовы методов DAM и делегирует их выполнение асинхронной задаче.
-    Вызов метода через этот прокси блокирует выполнение до получения результата
-    от воркера или истечения таймаута.
-    """
-
     def __init__(
         self,
         dam_instance: "BaseDataAccessManager",
@@ -78,11 +69,6 @@ class BrokerTaskProxy:
         )
 
     def __getattr__(self, name: str) -> Any:
-        """
-        Перехватывает доступ к атрибуту (методу) экземпляра DAM.
-        Возвращает обертку, которая отправляет задачу в Taskiq, ожидает
-        результат и возвращает его.
-        """
         try:
             original_method = getattr(self._dam, name)
         except AttributeError:
@@ -109,10 +95,6 @@ class BrokerTaskProxy:
         async def task_kicker_and_waiter(
             *args: Any, _broker_timeout: int = 30, **kwargs: Any
         ) -> Any:
-            """
-            Обертка для метода DAM: отправляет задачу, ожидает результат и возвращает его.
-            Параметр `_broker_timeout` (в секундах) контролирует время ожидания результата задачи.
-            """
             logger.info(
                 f"BrokerProxy: Kicking task for DAM method '{self._model_name}.{name}' and waiting (timeout: {_broker_timeout}s)."
             )
@@ -130,9 +112,7 @@ class BrokerTaskProxy:
                     f"Failed to serialize arguments for broker task: {e}"
                 ) from e
 
-            task_result_handle: Optional[TaskiqResult] = (
-                None  # Используем более описательное имя
-            )
+            task_result_handle: Optional[TaskiqResult] = None
             try:
                 if not hasattr(execute_dam_operation, "kiq"):
                     logger.critical(
@@ -168,7 +148,7 @@ class BrokerTaskProxy:
                 )
                 worker_response: TaskiqResult = await task_result_handle.wait_result(
                     timeout=_broker_timeout
-                )  # Имя переменной изменено
+                )
                 logger.debug(
                     f"BrokerProxy: Result received for task {task_result_handle.task_id}."
                 )
@@ -193,7 +173,7 @@ class BrokerTaskProxy:
                         f"BrokerProxy: Worker task '{name}' successful. Raw return value type: {type(raw_return_value)}"
                     )
                     final_result = _deserialize_broker_result(
-                        raw_return_value, self._dam
+                        raw_return_value, self._dam # Передаем self._dam
                     )
                     logger.debug(
                         f"BrokerProxy: Deserialized result type for '{name}': {type(final_result)}"
@@ -218,16 +198,16 @@ class BrokerTaskProxy:
                 raise CoreSDKError(
                     f"Taskiq error during async execution of '{name}': {e}"
                 ) from e
-            except AttributeError as e:  # Если нет .kiq() или другая ошибка атрибута
+            except AttributeError as e:
                 logger.critical(
                     f"BrokerProxy: AttributeError in task_kicker for '{name}': {e}",
                     exc_info=True,
                 )
-                raise  # Перевыбрасываем, это серьезная ошибка конфигурации
+                raise
             except Exception as e:
                 logger.exception(
                     f"BrokerProxy: Unexpected error in task_kicker for '{name}'."
                 )
-                raise  # Перевыбрасываем другие неожиданные ошибки
+                raise
 
         return task_kicker_and_waiter

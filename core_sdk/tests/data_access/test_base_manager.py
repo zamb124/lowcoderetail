@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field as PydanticField, ValidationError
 from starlette.exceptions import HTTPException  # Используем из starlette
 
 from core_sdk.data_access.base_manager import BaseDataAccessManager
+from core_sdk.data_access.local_manager import LocalDataAccessManager
 # Убираем импорты DataAccessManagerFactory и ModelRegistry, если они не используются напрямую в этом файле
 # from data_access import DataAccessManagerFactory # Вероятно, это apps.frontend.data_access, не нужно здесь
 # from registry import ModelRegistry # Вероятно, это apps.frontend.registry, не нужно здесь
@@ -17,8 +18,8 @@ from core_sdk.data_access.base_manager import BaseDataAccessManager
 from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead, ItemFilter
 import logging  # Добавим логгирование для тестов
 
-from data_access import DataAccessManagerFactory
-from registry import ModelRegistry
+from core_sdk.data_access import DataAccessManagerFactory
+from core_sdk.registry import ModelRegistry
 
 test_logger = logging.getLogger("core_sdk.tests.test_base_manager")
 
@@ -343,7 +344,7 @@ async def test_list_items_filter_with_registered_filter_class(
 
 
 # --- Тесты для хуков (пример) ---
-class CustomItemManager(BaseDataAccessManager[Item, ItemCreate, ItemUpdate]):
+class CustomItemManager(LocalDataAccessManager[Item, ItemCreate, ItemUpdate]):
     model = Item  # Нужно явно указать для _get_filter_class
     create_schema = ItemCreate
     update_schema = ItemUpdate

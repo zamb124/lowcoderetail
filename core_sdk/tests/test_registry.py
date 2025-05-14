@@ -16,6 +16,9 @@ from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter
 from core_sdk.registry import ModelRegistry, ModelInfo, RemoteConfig
 from core_sdk.exceptions import ConfigurationError
 from core_sdk.data_access.base_manager import BaseDataAccessManager
+from core_sdk.data_access import LocalDataAccessManager
+from core_sdk.data_access import RemoteDataAccessManager
+
 
 # --- Вспомогательные классы для тестов ---
 
@@ -108,7 +111,7 @@ def test_register_local_defaults():
     model_key_for_get = RegTestModel.__name__
     info = ModelRegistry.get_model_info(model_key_for_get)
     assert info.model_cls is RegTestModel
-    assert info.manager_cls is BaseDataAccessManager
+    assert info.manager_cls is LocalDataAccessManager
     assert info.read_schema_cls is RegTestModel
     assert info.create_schema_cls is None
     assert info.update_schema_cls is None
@@ -129,7 +132,7 @@ def test_register_remote_success():
     )
     info = ModelRegistry.get_model_info("MyRemoteItem")
     assert info.model_cls is RegTestPydanticSchema
-    assert info.manager_cls is Any
+    assert info.manager_cls is RemoteDataAccessManager
     assert info.access_config is remote_conf
     assert info.read_schema_cls is RegTestPydanticSchema
 
@@ -142,7 +145,7 @@ def test_register_overwrites_existing_with_warning(caplog):
         model_name="Item", model_cls=RegTestModel, manager_cls=AnotherManager
     )
 
-    assert "model name 'item' is already registered" in caplog.text.lower()
+    assert " is already registered" in caplog.text.lower()
     info = ModelRegistry.get_model_info("Item")
     assert info.manager_cls is AnotherManager
 

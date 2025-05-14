@@ -401,7 +401,7 @@ async def get_select_options(
     try:
         items = await manager.list(limit=options_limit, filters=filters)
         options_list = []
-        for item in items:
+        for item in items['items']:
             item_id_val = getattr(item, "id", None)
             label = next(
                 (

@@ -48,7 +48,7 @@ print("Copy this hash and use it in the SQL INSERT statement for the 'users' tab
     '$2b$12$bbzSZy8MgOJkuVLhsZSDBeC0BtZRApF.Oan.QUWzvRe5F7VwZObYa', -- Вставьте сюда хеш
     TRUE,                 -- Пользователь активен
     TRUE,                 -- Сделать суперпользователем (ВАЖНО для первого админа)
-    '4097e838-2129-4704-8421-4910918cbd4f', -- Вставьте сюда UUID компании
+    '29646cd6-e60f-4678-aa23-906ebd3c5ac0', -- Вставьте сюда UUID компании
     'Admin',              -- Опционально: Имя
     'User'                -- Опционально: Фамилия
 );

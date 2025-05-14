@@ -12,7 +12,7 @@ from typing import (
     Any,
     Optional as TypingOptional,
     List as TypingList,
-    Optional,
+    Optional, Union, Literal, Mapping,
 )
 from unittest import mock
 
@@ -39,6 +39,7 @@ from core_sdk.db.session import (
 )
 from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
 from core_sdk.data_access.base_manager import BaseDataAccessManager
+from core_sdk.data_access.local_manager import LocalDataAccessManager # Добавить импорт
 from core_sdk.data_access.manager_factory import DataAccessManagerFactory
 from core_sdk.filters.base import DefaultFilter
 from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter
@@ -75,9 +76,40 @@ class FactoryTestItemRead(FactoryTestItem):
 
 
 class CustomLocalFactoryItemManager(
-    BaseDataAccessManager[FactoryTestItem, FactoryTestItemCreate, FactoryTestItemUpdate]
+    LocalDataAccessManager[FactoryTestItemRead, FactoryTestItemCreate, FactoryTestItemUpdate]
 ):
-    pass
+    # db_model_cls будет установлен фабрикой или при регистрации
+    # model_cls (ReadSchema) устанавливается в super().__init__
+
+    # --- ЗАГЛУШКИ ДЛЯ АБСТРАКТНЫХ МЕТОДОВ ---
+    async def list(self, *, cursor: Optional[int] = None, limit: int = 50,
+                   filters: Optional[Union[BaseSQLAlchemyFilter, Mapping[str, Any]]] = None,
+                   direction: Literal["asc", "desc"] = "asc") -> Dict[str, Any]:
+        # Эта реализация нужна только для того, чтобы класс не был абстрактным
+        # В реальных тестах этот менеджер будет мокирован или будет использоваться его реальная логика,
+        # если он не просто мок, а кастомный менеджер с логикой.
+        # Для данного теста, где мы проверяем, что фабрика возвращает *ЭТОТ* класс,
+        # реализация не так важна.
+        if not hasattr(self, 'db_model_cls'): # Проверка на случай, если db_model_cls не установлен
+            raise NotImplementedError("db_model_cls not set for CustomLocalFactoryItemManager")
+        return {"items": [], "next_cursor": None, "limit": limit, "count": 0} # pragma: no cover
+
+    async def get(self, item_id: uuid.UUID) -> Optional[FactoryTestItemRead]:
+        return None # pragma: no cover
+
+    async def create(self, data: Union[FactoryTestItemCreate, Dict[str, Any]]) -> FactoryTestItemRead:
+        if isinstance(data, Dict): data_model = FactoryTestItemCreate.model_validate(data)
+        else: data_model = data
+        # Возвращаем экземпляр ReadSchema
+        return FactoryTestItemRead(id=uuid.uuid4(), name=data_model.name, description=data_model.description) # pragma: no cover
+
+    async def update(self, item_id: uuid.UUID, data: Union[FactoryTestItemUpdate, Dict[str, Any]]) -> FactoryTestItemRead:
+        if isinstance(data, Dict): data_model = FactoryTestItemUpdate.model_validate(data)
+        else: data_model = data
+        return FactoryTestItemRead(id=item_id, name=data_model.name or "Updated", description=data_model.description) # pragma: no cover
+
+    async def delete(self, item_id: uuid.UUID) -> bool:
+        return True # pragma: no cover
 
 
 class AnotherFactoryItem(SQLModel, table=True):
@@ -93,7 +125,7 @@ class AnotherFactoryItemRead(AnotherFactoryItem):
 class Item(SQLModel, table=True):
     __tablename__ = "sdk_test_items_global_v2"
     id: TypingOptional[uuid.UUID] = SQLModelField(
-        default_factory=uuid.uuid4, primary_key=True
+        default_factory=uuid.uuid4, primary_key=True,
     )
     name: str = SQLModelField(index=True)
     description: TypingOptional[str] = SQLModelField(default=None)
@@ -377,11 +409,14 @@ def dam_factory(
 
 @pytest.fixture(scope="function")
 def item_manager(
-    dam_factory: DataAccessManagerFactory, db_session: AsyncSession
-) -> BaseDataAccessManager[Item, ItemCreate, ItemUpdate]:
+    dam_factory: DataAccessManagerFactory, # dam_factory уже настроена с ModelRegistry
+    db_session: AsyncSession # Для установки сессии, если менеджер ее использует напрямую (хотя должен через get_current_session)
+) -> LocalDataAccessManager[ItemRead, ItemCreate, ItemUpdate]: # Уточняем тип
     logger.debug("item_manager fixture: Getting 'Item' manager.")
+    # Фабрика вернет LocalDataAccessManager, так как "Item" зарегистрирован как локальный
     manager = dam_factory.get_manager("Item")
-    return manager
+    assert isinstance(manager, LocalDataAccessManager), "Expected LocalDataAccessManager for 'Item'"
+    return manager # type: ignore
 
 
 @pytest_asyncio.fixture

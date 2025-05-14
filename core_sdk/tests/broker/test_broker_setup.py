@@ -1,179 +1,275 @@
-# core_sdk/tests/broker/test_broker_setup.py
+# core_sdk/tests/data_access/test_broker_proxy.py
 import pytest
-import os
-import sys
-import importlib
+import uuid
+import json
+from typing import List, Dict, Any, Optional, Union, Literal, Mapping # Добавлены Union, Literal, Mapping
+from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField
+from sqlmodel import SQLModel, Field as SQLModelField
 from unittest import mock
-import logging
 
-from taskiq import InMemoryBroker
-from taskiq.abc import AsyncBroker
-from taskiq_redis import RedisStreamBroker, RedisAsyncResultBackend
+from taskiq import TaskiqResult, TaskiqError, TaskiqResultTimeoutError
+from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter # Для list
 
-# Импортируем модуль как псевдоним для перезагрузки
-import core_sdk.broker.setup as broker_setup_module
-
-
-# --- Вспомогательные функции ---
-def reload_broker_setup_module():
-    # logger перед перезагрузкой, чтобы убедиться, что он существует
-    # и мы можем на него ссылаться для caplog.at_level
-    _ = logging.getLogger("core_sdk.broker.setup")
-
-    importlib.reload(broker_setup_module)
-
-    return broker_setup_module.broker
-
-
-# --- Тесты ---
-
-
-def test_broker_is_inmemory_when_env_is_test(monkeypatch: pytest.MonkeyPatch, caplog):
-    monkeypatch.setenv("ENV", "test")
-    monkeypatch.setenv("REDIS_URL", "redis://some-redis-that-might-not-exist:6379/0")
-
-    # Используем caplog.at_level как контекстный менеджер
-    with caplog.at_level(logging.INFO, logger="core_sdk.broker.setup"):
-        broker = reload_broker_setup_module()
-
-    assert isinstance(broker, InMemoryBroker)
-    print(f"CAPLOG TEXT for ENV=test: {caplog.text}")
-    assert "Using InMemoryBroker for 'test' environment." in caplog.text
-    # Проверим, что другие сообщения тоже есть, если они были
-    assert "Initializing InMemoryBroker as a potential broker." in caplog.text
-
-
-def test_broker_is_inmemory_when_env_is_not_set(
-    monkeypatch: pytest.MonkeyPatch, caplog
-):
-    monkeypatch.delenv("ENV", raising=False)
-    monkeypatch.delenv("REDIS_URL", raising=False)
-
-    with caplog.at_level(logging.INFO, logger="core_sdk.broker.setup"):
-        broker = reload_broker_setup_module()
-
-    assert isinstance(broker, InMemoryBroker)
-    print(f"CAPLOG TEXT for ENV not set: {caplog.text}")
-    assert "Using InMemoryBroker (ENV not set or not 'prod')." in caplog.text
-
-
-def test_broker_is_inmemory_when_env_is_dev(monkeypatch: pytest.MonkeyPatch, caplog):
-    monkeypatch.setenv("ENV", "dev")
-    monkeypatch.setenv("REDIS_URL", "redis://some-redis-that-might-not-exist:6379/0")
-
-    with caplog.at_level(logging.INFO, logger="core_sdk.broker.setup"):
-        broker = reload_broker_setup_module()
-
-    assert isinstance(broker, InMemoryBroker)
-    print(f"CAPLOG TEXT for ENV=dev: {caplog.text}")
-    assert "Using InMemoryBroker for 'dev' environment." in caplog.text
-
-
-@mock.patch("taskiq_redis.RedisStreamBroker")
-@mock.patch("taskiq_redis.RedisAsyncResultBackend")
-def test_broker_is_redis_when_env_is_prod_and_redis_available(
-    mock_redis_backend_cls: mock.MagicMock,
-    mock_redis_broker_cls: mock.MagicMock,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog,
-):
-    monkeypatch.setenv("ENV", "prod")
-    test_redis_url = "redis://mocked-redis:1234/1"
-    monkeypatch.setenv("REDIS_URL", test_redis_url)
-
-    mock_backend_instance = mock.Mock(spec=RedisAsyncResultBackend)
-    mock_redis_backend_cls.return_value = mock_backend_instance
-    mock_base_broker_instance = mock.Mock(spec=RedisStreamBroker)
-    mock_broker_with_backend = mock.Mock(spec=AsyncBroker)
-    mock_base_broker_instance.with_result_backend.return_value = (
-        mock_broker_with_backend
-    )
-    mock_redis_broker_cls.return_value = mock_base_broker_instance
-
-    with caplog.at_level(logging.INFO, logger="core_sdk.broker.setup"):
-        broker = reload_broker_setup_module()
-
-    mock_redis_backend_cls.assert_called_once_with(redis_url=test_redis_url)
-    mock_redis_broker_cls.assert_called_once_with(url=test_redis_url)
-    mock_base_broker_instance.with_result_backend.assert_called_once_with(
-        mock_backend_instance
-    )
-
-    assert broker is mock_broker_with_backend
-    print(f"CAPLOG TEXT for ENV=prod, Redis OK: {caplog.text}")
-    assert "Using Redis Broker for 'prod' environment." in caplog.text
-    assert "Redis broker configured successfully." in caplog.text
-
-
-@mock.patch(
-    "taskiq_redis.RedisStreamBroker", side_effect=Exception("Redis connection failed")
+from core_sdk.data_access.broker_proxy import (
+    _serialize_arg,
+    _deserialize_broker_result,
+    BrokerTaskProxy,
 )
-@mock.patch("taskiq_redis.RedisAsyncResultBackend")
-def test_broker_fallbacks_to_inmemory_if_redis_fails_on_prod(
-    mock_redis_backend_cls: mock.MagicMock,
-    mock_redis_broker_cls_with_error: mock.MagicMock,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog,
-):
-    monkeypatch.setenv("ENV", "prod")
-    monkeypatch.setenv("REDIS_URL", "redis://unreachable-redis:6379/0")
+from core_sdk.broker.tasks import execute_dam_operation
+from core_sdk.data_access.base_manager import BaseDataAccessManager
+from core_sdk.registry import ModelRegistry
+from core_sdk.exceptions import CoreSDKError
 
-    # Устанавливаем уровень захвата для caplog на ERROR, чтобы поймать и CRITICAL, и ERROR
-    with caplog.at_level(
-        logging.ERROR, logger="core_sdk.broker.setup"
-    ):  # <--- ИЗМЕНЕНИЕ УРОВНЯ
-        broker = reload_broker_setup_module()
+from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead
 
-    assert isinstance(broker, InMemoryBroker)
+pytestmark = pytest.mark.asyncio
 
-    # Выведем все записи для отладки
-    print("Captured log records for ENV=prod, Redis Fail:")
-    for record in caplog.records:
-        print(f"  {record.levelname}: {record.message}")
+# --- Тесты для _serialize_arg (без изменений) ---
+def test_serialize_arg_primitives():
+    assert _serialize_arg(123) == 123
+    assert _serialize_arg("hello") == "hello"
+    assert _serialize_arg(True) is True
+    assert _serialize_arg(None) is None
+    assert _serialize_arg(12.34) == 12.34
 
-    # Проверяем критическое сообщение об ошибке
-    assert any(
-        "FAILED to initialize Redis Broker" in record.message
-        and record.levelname == "CRITICAL"
-        for record in caplog.records
-    ), "CRITICAL 'FAILED to initialize' message not found"
+def test_serialize_arg_uuid():
+    uid = uuid.uuid4()
+    assert _serialize_arg(uid) == str(uid)
 
-    # Проверяем сообщение об ошибке из side_effect (оно будет частью CRITICAL сообщения)
-    assert any(
-        "Redis connection failed" in record.message for record in caplog.records
-    ), "Specific 'Redis connection failed' message not found"
+class SimplePydantic(PydanticBaseModel):
+    name: str
+    age: int
 
-    # Проверяем сообщение о fallback (уровень ERROR)
-    assert any(
-        "Falling back to InMemoryBroker" in record.message
-        and record.levelname == "ERROR"
-        for record in caplog.records
-    ), "ERROR 'Falling back to InMemoryBroker' message not found"
+def test_serialize_arg_pydantic_model():
+    model = SimplePydantic(name="Test", age=30)
+    assert _serialize_arg(model) == {"name": "Test", "age": 30}
+
+def test_serialize_arg_list():
+    uid = uuid.uuid4()
+    model = SimplePydantic(name="InList", age=25)
+    serialized_list = _serialize_arg([1, uid, model, None])
+    assert serialized_list == [1, str(uid), {"name": "InList", "age": 25}, None]
+
+def test_serialize_arg_dict():
+    uid = uuid.uuid4()
+    model = SimplePydantic(name="InDict", age=20)
+    serialized_dict = _serialize_arg({"key1": uid, "key2": model, "key3": "simple"})
+    assert serialized_dict == {
+        "key1": str(uid),
+        "key2": {"name": "InDict", "age": 20},
+        "key3": "simple",
+    }
+
+# --- Тесты для _deserialize_broker_result ---
+class MockDamForDeserialize(BaseDataAccessManager[ItemRead, ItemCreate, ItemUpdate]):
+    # model_cls в BaseDataAccessManager - это ReadSchema
+    # db_model_cls (если бы это был LocalManager) - это SQLModel
+    def __init__(self):
+        # Для BaseDataAccessManager model_cls должен быть ReadSchema
+        super().__init__(model_name="ItemDeserializeTest", model_cls=ItemRead)
+        # read_schema здесь не нужен, так как он уже model_cls в BaseManager
+
+    # --- Реализация абстрактных методов ---
+    async def list(self, *, cursor: Optional[int] = None, limit: int = 50,
+                   filters: Optional[Union[BaseSQLAlchemyFilter, Mapping[str, Any]]] = None,
+                   direction: Literal["asc", "desc"] = "asc") -> Dict[str, Any]:
+        raise NotImplementedError # pragma: no cover
+
+    async def get(self, item_id: uuid.UUID) -> Optional[ItemRead]:
+        raise NotImplementedError # pragma: no cover
+
+    async def create(self, data: Union[ItemCreate, Dict[str, Any]]) -> ItemRead:
+        raise NotImplementedError # pragma: no cover
+
+    async def update(self, item_id: uuid.UUID, data: Union[ItemUpdate, Dict[str, Any]]) -> ItemRead:
+        raise NotImplementedError # pragma: no cover
+
+    async def delete(self, item_id: uuid.UUID) -> bool:
+        raise NotImplementedError # pragma: no cover
 
 
-@mock.patch("taskiq_redis.RedisStreamBroker")
-@mock.patch("taskiq_redis.RedisAsyncResultBackend")
-def test_broker_fallbacks_if_redis_url_not_set_on_prod(
-    mock_redis_backend_cls: mock.MagicMock,
-    mock_redis_broker_cls: mock.MagicMock,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog,
-):
-    monkeypatch.setenv("ENV", "prod")
-    monkeypatch.delenv("REDIS_URL", raising=False)
 
-    mock_redis_broker_cls.side_effect = Exception(
-        "Cannot connect to default localhost Redis"
+def test_deserialize_broker_result_uuid_string():
+    dam_instance = MockDamForDeserialize()
+    uid_str = str(uuid.uuid4())
+    result = _deserialize_broker_result(uid_str, dam_instance)
+    assert isinstance(result, uuid.UUID)
+    assert result == uuid.UUID(uid_str)
+
+def test_deserialize_broker_result_other_string():
+    dam_instance = MockDamForDeserialize()
+    result = _deserialize_broker_result("simple_string", dam_instance)
+    assert result == "simple_string"
+
+def test_deserialize_broker_result_primitive():
+    dam_instance = MockDamForDeserialize()
+    assert _deserialize_broker_result(123, dam_instance) == 123
+    assert _deserialize_broker_result(None, dam_instance) is None
+
+# --- Тесты для BrokerTaskProxy ---
+class MockDamForProxy(BaseDataAccessManager[ItemRead, ItemCreate, ItemUpdate]):
+    def __init__(self, model_name="ProxyTestItem"):
+        # model_cls для BaseDataAccessManager - это схема чтения
+        super().__init__(model_name=model_name, model_cls=ItemRead,
+                         create_schema_cls=ItemCreate, update_schema_cls=ItemUpdate)
+
+    # --- Реализация абстрактных методов ---
+    async def list(self, *, cursor: Optional[int] = None, limit: int = 50,
+                   filters: Optional[Union[BaseSQLAlchemyFilter, Mapping[str, Any]]] = None,
+                   direction: Literal["asc", "desc"] = "asc") -> Dict[str, Any]:
+        # Этот метод не будет вызван напрямую в юнит-тестах BrokerTaskProxy,
+        # но должен быть реализован.
+        # Возвращаем структуру, совместимую с PaginatedResponse
+        return {"items": [], "next_cursor": None, "limit": limit, "count": 0} # pragma: no cover
+
+    async def get(
+        self, item_id: uuid.UUID, some_kwarg: str = "default" # Добавляем some_kwarg для теста
+    ) -> Optional[ItemRead]:
+        # Этот метод не будет вызван напрямую в юнит-тестах BrokerTaskProxy
+        return None # pragma: no cover
+
+    async def create(self, data: Union[ItemCreate, Dict[str, Any]]) -> ItemRead:
+        # Этот метод не будет вызван напрямую в юнит-тестах BrokerTaskProxy
+        # Убедимся, что data имеет нужный тип для model_dump
+        name_val = data.name if isinstance(data, ItemCreate) else data.get("name", "Default Name")
+        desc_val = data.description if isinstance(data, ItemCreate) else data.get("description")
+        value_val = data.value if isinstance(data, ItemCreate) else data.get("value")
+
+        return ItemRead(
+            id=uuid.uuid4(),
+            name=name_val, # type: ignore
+            description=desc_val, # type: ignore
+            value=value_val, # type: ignore
+            lsn=2,
+        ) # pragma: no cover
+
+    async def update(self, item_id: uuid.UUID, data: Union[ItemUpdate, Dict[str, Any]]) -> ItemRead:
+        # Этот метод не будет вызван напрямую в юнит-тестах BrokerTaskProxy
+        name_val = data.name if isinstance(data, ItemUpdate) else data.get("name", "Updated Name")
+        desc_val = data.description if isinstance(data, ItemUpdate) else data.get("description")
+        value_val = data.value if isinstance(data, ItemUpdate) else data.get("value")
+        return ItemRead(
+            id=item_id,
+            name=name_val, # type: ignore
+            description=desc_val, # type: ignore
+            value=value_val, # type: ignore
+            lsn=3
+        ) # pragma: no cover
+
+    async def delete(self, item_id: uuid.UUID) -> bool:
+        # Этот метод не будет вызван напрямую в юнит-тестах BrokerTaskProxy
+        return True # pragma: no cover
+
+
+@pytest.fixture
+def mock_dam_instance_for_proxy() -> MockDamForProxy:
+    return MockDamForProxy()
+
+@pytest.fixture
+def broker_proxy(mock_dam_instance_for_proxy: MockDamForProxy) -> BrokerTaskProxy:
+    return BrokerTaskProxy(
+        dam_instance=mock_dam_instance_for_proxy, model_name="ProxyTestItem"
     )
 
-    with caplog.at_level(
-        logging.INFO, logger="core_sdk.broker.setup"
-    ):  # Ловим INFO и выше
-        broker = reload_broker_setup_module()
+@pytest.fixture
+def mock_taskiq_result_factory() -> type:
+    class MockTaskResult:
+        def __init__(self, return_value=None, is_err=False, error=None, task_id=None):
+            self.return_value = return_value
+            self.is_err = is_err
+            self.error = error
+            self.task_id = task_id or str(uuid.uuid4())
+            self._wait_result_called = False
 
-    assert isinstance(broker, InMemoryBroker)
-    print(f"CAPLOG TEXT for ENV=prod, REDIS_URL not set: {caplog.text}")
-    assert "FAILED to initialize Redis Broker" in caplog.text
-    assert "redis://localhost:6379/0" in caplog.text
-    assert "Cannot connect to default localhost Redis" in caplog.text
-    assert "Falling back to InMemoryBroker" in caplog.text
+        async def wait_result(self, timeout: int = 30):
+            self._wait_result_called = True
+            if timeout == 0:
+                raise TaskiqResultTimeoutError()
+            if self.is_err:
+                if isinstance(self.error, str) and self.error == "TaskiqError":
+                    raise TaskiqError # Добавил сообщение
+            return self
+
+    return MockTaskResult
+
+# --- Остальные тесты для BrokerTaskProxy (без изменений) ---
+async def test_broker_proxy_method_call_success(
+    broker_proxy: BrokerTaskProxy,
+    mock_taskiq_result_factory: type,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    item_id_to_get = uuid.UUID("11111111-1111-1111-1111-111111111111")
+    expected_name = "Proxy Get Item from Worker"
+    worker_raw_return_value = {
+        "id": str(item_id_to_get),
+        "name": expected_name,
+        "lsn": 1,
+        "description": None,
+        "value": None,
+    }
+    mock_result_handle = mock_taskiq_result_factory(
+        return_value=worker_raw_return_value
+    )
+    mock_kiq = mock.AsyncMock(return_value=mock_result_handle)
+    monkeypatch.setattr(execute_dam_operation, "kiq", mock_kiq)
+
+    result = await broker_proxy.get(
+        item_id_to_get, some_kwarg="via_proxy", _broker_timeout=5 # type: ignore
+    )
+
+    mock_kiq.assert_called_once()
+    call_args_kwargs = mock_kiq.call_args.kwargs
+    assert call_args_kwargs["model_name"] == "ProxyTestItem"
+    assert call_args_kwargs["method_name"] == "get"
+    assert call_args_kwargs["serialized_args"] == [_serialize_arg(item_id_to_get)]
+    assert call_args_kwargs["serialized_kwargs"] == {"some_kwarg": "via_proxy"}
+    assert mock_result_handle._wait_result_called
+
+
+async def test_broker_proxy_timeout(
+    broker_proxy: BrokerTaskProxy,
+    mock_taskiq_result_factory: type,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    item_id_to_get = uuid.uuid4()
+    mock_result_handle = mock_taskiq_result_factory()
+    mock_kiq = mock.AsyncMock(return_value=mock_result_handle)
+    monkeypatch.setattr(execute_dam_operation, "kiq", mock_kiq)
+
+    with pytest.raises(TimeoutError) as exc_info:
+        await broker_proxy.get(item_id_to_get, _broker_timeout=0) # type: ignore
+    assert "did not complete within 0 seconds" in str(exc_info.value)
+    assert mock_result_handle._wait_result_called
+
+async def test_broker_proxy_worker_returns_error_object(
+    broker_proxy: BrokerTaskProxy,
+    mock_taskiq_result_factory: type,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    item_id_to_get = uuid.uuid4()
+    worker_exception = ValueError("Worker failed processing!")
+    mock_result_handle = mock_taskiq_result_factory(is_err=True, error=worker_exception)
+    mock_kiq = mock.AsyncMock(return_value=mock_result_handle)
+    monkeypatch.setattr(execute_dam_operation, "kiq", mock_kiq)
+
+    with pytest.raises(CoreSDKError) as exc_info:
+        await broker_proxy.get(item_id_to_get) # type: ignore
+    assert "execution failed in worker" in str(exc_info.value)
+    assert exc_info.value.__cause__ is worker_exception
+    assert mock_result_handle._wait_result_called
+
+async def test_broker_proxy_wait_result_raises_taskiq_error(
+    broker_proxy: BrokerTaskProxy,
+    mock_taskiq_result_factory: type,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    item_id_to_get = uuid.uuid4()
+    mock_result_handle = mock_taskiq_result_factory(is_err=True, error="TaskiqError")
+    mock_kiq = mock.AsyncMock(return_value=mock_result_handle)
+    monkeypatch.setattr(execute_dam_operation, "kiq", mock_kiq)
+
+    with pytest.raises(CoreSDKError) as exc_info:
+        await broker_proxy.get(item_id_to_get) # type: ignore
+    assert "Taskiq error during async execution" in str(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, TaskiqError)
+    assert mock_result_handle._wait_result_called

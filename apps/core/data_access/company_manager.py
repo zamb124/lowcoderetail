@@ -5,13 +5,12 @@ from uuid import UUID
 
 from fastapi import HTTPException, status  # Добавляем status для кодов ошибок
 
+from clients.base import ModelType_client
 # Импортируем базовый менеджер и нужные типы из SDK
-from core_sdk.data_access.base_manager import (
-    BaseDataAccessManager,
-    CreateSchemaType,
-    ModelType,
-)
 from core_sdk.exceptions import CoreSDKError  # Для обработки ошибок базового менеджера
+from core_sdk.data_access import LocalDataAccessManager
+from crud.factory import CreateSchemaType
+from data_access.base_manager import ModelType_co
 
 # Локальные импорты приложения
 from .. import models  # Нужны модели для type hinting и операций
@@ -25,7 +24,7 @@ logger = logging.getLogger(__name__)  # Имя будет app.data_access.compan
 
 
 class CompanyDataAccessManager(
-    BaseDataAccessManager[
+    LocalDataAccessManager[
         models.company.Company,
         schemas.company.CompanyCreate,
         schemas.company.CompanyUpdate,
@@ -41,23 +40,6 @@ class CompanyDataAccessManager(
     model = models.company.Company
     create_schema = schemas.company.CompanyCreate
     update_schema = schemas.company.CompanyUpdate
-
-    # --- Переопределение хуков базового менеджера (Примеры) ---
-    # В данном случае стандартное поведение подходит, поэтому методы закомментированы.
-    # async def _prepare_for_create(self, validated_data: schemas.company.CompanyCreate) -> models.company.Company:
-    #     logger.debug(f"Company DAM: Custom prepare for create for company name: {validated_data.name}")
-    #     # Здесь может быть специфичная логика перед созданием компании
-    #     db_item = await super()._prepare_for_create(validated_data)
-    #     # Например, установка дополнительных полей
-    #     return db_item
-
-    # async def _prepare_for_update(self, db_item: models.company.Company, update_payload: Dict[str, Any]) -> tuple[models.company.Company, bool]:
-    #     logger.debug(f"Company DAM: Custom prepare for update for company ID: {db_item.id}")
-    #     # Здесь может быть специфичная логика перед обновлением компании
-    #     db_item, updated = await super()._prepare_for_update(db_item, update_payload)
-    #     # ...
-    #     return db_item, updated
-
     # --- Кастомные методы, специфичные для Company ---
 
     async def get_by_name(self, name: str) -> Optional[models.company.Company]:
@@ -210,7 +192,7 @@ class CompanyDataAccessManager(
                 detail=f"Failed to deactivate company: {e}",
             )
 
-    async def create(self, data: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType:
+    async def create(self, data: Union[CreateSchemaType, Dict[str, Any]]) -> ModelType_co:
         """
         Создает новую компанию и устанавливает ее company_id равным ее собственному id.
         Переопределяет базовый метод create.
