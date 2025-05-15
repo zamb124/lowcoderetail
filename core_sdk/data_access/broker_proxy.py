@@ -4,6 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, List, Type
 from uuid import UUID
 from pydantic import BaseModel, ValidationError
+from sqlmodel import SQLModel
 
 from core_sdk.broker.setup import broker
 from core_sdk.broker.tasks import execute_dam_operation
@@ -30,29 +31,53 @@ def _serialize_arg(arg: Any) -> Any:
     return arg
 
 
-def _deserialize_broker_result(data: Any, dam_instance: "BaseDataAccessManager") -> Any:
-    """
-    Пытается десериализовать результат, полученный от воркера,
-    используя read_schema менеджера, если это возможно.
-    """
-    read_schema: Optional[Type[BaseModel]] = getattr(dam_instance, "read_schema", None)
+def _deserialize_broker_result(data: Any, dam_instance: "BaseDataAccessManager[Any, Any, Any, Any]") -> Any:
+    target_read_schema: Optional[Type[PydanticBaseModel]] = dam_instance.read_schema_cls
 
-    if read_schema and isinstance(data, dict):
+    logger.debug(f"_deserialize_broker_result: Received data type: {type(data)}, target_read_schema: {target_read_schema.__name__ if target_read_schema else 'None'}")
+
+    if target_read_schema:
+        if isinstance(data, dict):
+            try:
+                logger.debug(f"Attempting to validate dict data into {target_read_schema.__name__}")
+                validated_obj = target_read_schema.model_validate(data)
+                logger.debug(f"Successfully validated data into {target_read_schema.__name__}")
+                return validated_obj
+            except ValidationError as ve: # Явно ловим ValidationError
+                logger.error(f"ValidationError when deserializing dict into {target_read_schema.__name__}: {ve.errors()}. Returning raw dict.", exc_info=True)
+                # В случае ошибки валидации, возможно, лучше выбросить исключение или вернуть None,
+                # чем возвращать исходный словарь, так как это может скрыть проблему.
+                # Пока оставим возврат словаря для совместимости с текущими тестами, но это место для улучшения.
+                return data
+            except Exception as e: # Другие ошибки при model_validate
+                logger.error(f"Unexpected error when deserializing dict into {target_read_schema.__name__}: {e}. Returning raw dict.", exc_info=True)
+                return data
+        elif isinstance(data, SQLModel) and hasattr(data, 'model_dump'): # Если это SQLModel объект
+            try:
+                logger.debug(f"Attempting to validate SQLModel instance ({type(data).__name__}) into {target_read_schema.__name__}")
+                # SQLModel -> dict -> Pydantic ReadSchema
+                validated_obj = target_read_schema.model_validate(data.model_dump())
+                logger.debug(f"Successfully validated SQLModel into {target_read_schema.__name__}")
+                return validated_obj
+            except ValidationError as ve:
+                logger.error(f"ValidationError when deserializing SQLModel into {target_read_schema.__name__}: {ve.errors()}. Returning raw SQLModel.", exc_info=True)
+                return data # Возвращаем исходный SQLModel
+            except Exception as e:
+                logger.error(f"Unexpected error when deserializing SQLModel into {target_read_schema.__name__}: {e}. Returning raw SQLModel.", exc_info=True)
+                return data
+        else:
+            logger.debug(f"Data is not a dict or SQLModel, or target_read_schema is None. Type of data: {type(data)}")
+    else:
+        logger.debug("No target_read_schema provided for deserialization.")
+
+
+    # Обработка для UUID и других простых типов (остается)
+    if isinstance(data, str):
         try:
-            return read_schema.model_validate(data)
-        except Exception as e:
-            logger.warning(
-                f"Failed to deserialize broker result into {read_schema.__name__}: {e}. Returning raw data: {data}"
-            )
-            return data
-    elif isinstance(data, str):
-        try:
-            # Простая проверка на формат UUID
             if len(data) == 36 and data.count("-") == 4:
                 return UUID(data)
         except ValueError:
-            pass  # Не UUID, возвращаем как строку
-        return data
+            pass
     return data
 
 

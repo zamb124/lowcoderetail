@@ -1,16 +1,17 @@
 # core_sdk/schemas/__init__.py
 
-# Импортируем и ре-экспортируем модули или классы
-
-# Пример ре-экспорта модулей:
+from .base import BaseSchema # <--- ДОБАВИТЬ
 from . import token
-from . import user  # Если UserRead переехал в SDK
-from . import i18n  # <--- ДОБАВЬТЕ ЭТУ СТРОКУ
-# from . import group # Если GroupRead переехал в SDK
-# from . import permission # Если PermissionRead переехал в SDK
-# from . import company # Если CompanyRead переехал в SDK
+from . import user
+from . import i18n
+from .pagination import PaginatedResponse # <--- ДОБАВИТЬ, если еще не там
+from .auth_user import AuthenticatedUser # <--- ДОБАВИТЬ, если еще не там
 
-# Пример ре-экспорта конкретных классов:
-# from .token import Token, TokenPayload
-# from .user import UserRead
-# from .i18n import Language, Country, Currency # <--- Или так
+__all__ = [
+    "BaseSchema",
+    "token",
+    "user",
+    "i18n",
+    "PaginatedResponse",
+    "AuthenticatedUser",
+]

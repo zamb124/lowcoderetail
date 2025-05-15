@@ -1,95 +1,47 @@
-# core/app/schemas/user.py
+# apps/core/schemas/user.py
 import logging
 import uuid
-from typing import Optional, List  # Убираем TYPE_CHECKING
+from typing import Optional, List
 
-from pydantic import EmailStr, Field
-from sqlmodel import SQLModel
+from pydantic import EmailStr, Field, BaseModel
 
-# --- ИСПРАВЛЕНИЕ: Прямой импорт GroupRead ---
+from core_sdk.schemas.base import BaseSchema
 from .group import GroupRead
-# -------------------------------------------
 
 logger = logging.getLogger("app.schemas.user")
 
-
-# Базовая схема с общими полями пользователя
-class UserBase(SQLModel):
+class UserBase(BaseSchema):
     email: EmailStr = Field(description="Email адрес пользователя (уникальный).")
     first_name: Optional[str] = Field(default=None, description="Имя пользователя.")
     last_name: Optional[str] = Field(default=None, description="Фамилия пользователя.")
     is_active: Optional[bool] = Field(
         default=True,
-        description="Флаг активности пользователя (может ли войти в систему).",
+        description="Флаг активности пользователя.",
     )
     is_superuser: Optional[bool] = Field(
-        default=False, description="Флаг суперпользователя (обладает всеми правами)."
+        default=False, description="Флаг суперпользователя."
     )
-    company_id: Optional[uuid.UUID] = Field(
-        default=None,
-        description="Идентификатор компании, к которой принадлежит пользователь (может быть NULL).",
-        rel="company",
-    )
+    # company_id наследуется из BaseSchema как Optional[uuid.UUID]
 
-
-# Схема для создания нового пользователя
 class UserCreate(UserBase):
-    """Схема для создания нового пользователя (требует пароль)."""
+    id: Optional[uuid.UUID] = Field(default=None) # Явное переопределение для гарантии
+    password: str = Field(description="Пароль пользователя.")
+    company_id: uuid.UUID # Переопределяем как обязательное для User
 
-    password: str = Field(
-        description="Пароль пользователя (будет хеширован перед сохранением)."
-    )
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = Field(default=None)
+    first_name: Optional[str] = Field(default=None)
+    last_name: Optional[str] = Field(default=None)
+    is_active: Optional[bool] = Field(default=None)
+    is_superuser: Optional[bool] = Field(default=None)
+    password: Optional[str] = Field(default=None)
+    company_id: Optional[uuid.UUID] = Field(default=None)
 
-
-# Схема для обновления существующего пользователя
-class UserUpdate(SQLModel):
-    """Схема для обновления данных пользователя. Все поля опциональны."""
-
-    email: Optional[EmailStr] = Field(
-        default=None, description="Новый email адрес пользователя."
-    )
-    first_name: Optional[str] = Field(
-        default=None, description="Новое имя пользователя."
-    )
-    last_name: Optional[str] = Field(
-        default=None, description="Новая фамилия пользователя."
-    )
-    is_active: Optional[bool] = Field(
-        default=None, description="Новый статус активности пользователя."
-    )
-    is_superuser: Optional[bool] = Field(
-        default=None, description="Новый статус суперпользователя."
-    )
-    password: Optional[str] = Field(
-        default=None, description="Новый пароль пользователя (если требуется изменить)."
-    )
-    company_id: Optional[uuid.UUID] = Field(
-        default=None,
-        description="Новый идентификатор компании пользователя.",
-        rel="company",
-    )
-
-
-# Схема для чтения данных пользователя (возвращается API) - без пароля
 class UserRead(UserBase):
-    """Схема для чтения основной информации о пользователе (без пароля)."""
+    pass
 
-    id: uuid.UUID = Field(description="Уникальный идентификатор пользователя.")
-    lsn: int = Field(
-        description="Последовательный номер записи (LSN) для отслеживания порядка изменений."
-    )
-
-
-# Схема для чтения пользователя с информацией о его группах
 class UserReadWithGroups(UserRead):
-    """Схема для чтения пользователя с информацией о группах, в которых он состоит."""
-
-    # --- ИСПРАВЛЕНИЕ: Можно убрать кавычки, если нет цикла импорта ---
-    groups: List[GroupRead] = Field(
-        default=[], description="Список групп, в которых состоит пользователь."
-    )
-    # -------------------------------------------------------------
-
+    groups: List[GroupRead] = Field(default_factory=list)
 
 logger.debug(
     "User schemas defined: UserBase, UserCreate, UserUpdate, UserRead, UserReadWithGroups"
