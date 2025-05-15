@@ -33,7 +33,8 @@ class BaseSchema(BaseModel):
 
     company_id: Optional[uuid.UUID] = Field(
         default=None,
-        description="Идентификатор компании, к которой относится запись"
+        description="Идентификатор компании, к которой относится запись",
+        rel='company'
     )
 
     lsn: Optional[int] = Field(

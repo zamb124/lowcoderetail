@@ -93,7 +93,7 @@ class RemoteDataAccessManager(BaseDataAccessManager[DM_ReadSchemaType, DM_Create
         if isinstance(filters, PydanticBaseModel):
             query_filters = filters.model_dump(exclude_none=True, by_alias=False)
         elif isinstance(filters, Mapping):
-            query_filters = {k: v for k, v in filters.items() if v is not None}
+            query_filters = {k: v for k, v in filters.items() if v != '' }
 
         try:
             paginated_dict_result = await self.client.list(
