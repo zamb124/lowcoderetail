@@ -4,10 +4,8 @@ import httpx
 from fastapi import APIRouter, Depends, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import HTMLResponse  # Для ошибок в proxy_login
-from sqlalchemy.dialects.postgresql import JSONB
 from starlette import status
 from starlette.exceptions import HTTPException
-from starlette.responses import JSONResponse
 
 from core_sdk.schemas.token import Token
 from data_access import (

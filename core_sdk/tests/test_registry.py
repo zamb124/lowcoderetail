@@ -1,13 +1,11 @@
 # core_sdk/tests/registry/test_registry.py
 import pytest
 from unittest import mock
-from typing import Type, Optional, Any, ClassVar, Dict
+from typing import Optional, Any, ClassVar, Dict
 
 from pydantic import (
     BaseModel as PydanticBaseModel,
     HttpUrl,
-    Field as PydanticField,
-    ValidationError,
     ConfigDict,
 )
 from sqlmodel import SQLModel, Field as SQLModelField
@@ -16,7 +14,6 @@ from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter
 from core_sdk.registry import ModelRegistry, ModelInfo, RemoteConfig
 from core_sdk.exceptions import ConfigurationError
 # Используем новые имена дженериков
-from core_sdk.data_access.base_manager import BaseDataAccessManager, DM_SQLModelType, DM_ReadSchemaType
 from core_sdk.data_access import LocalDataAccessManager
 from core_sdk.data_access import RemoteDataAccessManager
 

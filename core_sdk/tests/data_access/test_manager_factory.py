@@ -2,21 +2,16 @@
 import pytest
 import httpx
 from unittest import mock
-from typing import Optional, Any, Type, List
 
 import pytest_asyncio
-from pydantic import HttpUrl, BaseModel as PydanticBaseModel
-from sqlmodel import SQLModel, Field
-from starlette.requests import Request as StarletteRequest
 from fastapi import Request as FastAPIRequest
 
-from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
+from core_sdk.registry import ModelRegistry
 from core_sdk.data_access.manager_factory import (
     DataAccessManagerFactory,
     get_dam_factory,
 )
 # Импортируем правильные базовые классы и дженерики
-from core_sdk.data_access.base_manager import BaseDataAccessManager, DM_ReadSchemaType, DM_SQLModelType
 from core_sdk.data_access.local_manager import LocalDataAccessManager
 from core_sdk.data_access.remote_manager import RemoteDataAccessManager
 from core_sdk.exceptions import ConfigurationError
@@ -29,7 +24,6 @@ from core_sdk.tests.conftest import (
     FactoryTestItemRead, # Pydantic ReadSchema
     AnotherFactoryItem, # SQLModel
     AnotherFactoryItemRead, # Pydantic ReadSchema
-    manage_model_registry_for_tests,
     CustomLocalFactoryItemManager, # Этот менеджер уже адаптирован в conftest
 )
 import logging

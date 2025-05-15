@@ -33,7 +33,6 @@ from core_sdk.frontend.dependencies import (
 from core_sdk.frontend.renderer import ViewRenderer, RenderMode
 from core_sdk.frontend.templating import get_templates
 from core_sdk.frontend.config import STATIC_URL_PATH
-from core_sdk.registry import ModelRegistry
 from core_sdk.exceptions import ConfigurationError  # Используем SDK-шный
 from core_sdk.schemas.auth_user import AuthenticatedUser
 from dependencies.auth import get_optional_current_user
@@ -102,7 +101,7 @@ async def resolve_titles_endpoint(
         return ResolveTitlesResponse(root={})
     try:
         manager = dam_factory.get_manager(model_name, request=request)
-    except ConfigurationError as e:
+    except ConfigurationError:
         raise HTTPException(
             status_code=404, detail=f"Model '{model_name}' not configured."
         )
@@ -123,7 +122,7 @@ async def resolve_titles_endpoint(
         for item in list_result.get("items", []):
             if hasattr(item, "id"):
                 items_map[item.id] = item
-    except Exception as e:
+    except Exception:
         items_map = {}  # fallback
     for item_id_val in ids_to_resolve:
         item = items_map.get(item_id_val)
@@ -355,7 +354,7 @@ async def delete_item(renderer: ViewRenderer = Depends(get_view_mode_renderer)):
             )
     except HTTPException as e:
         raise e
-    except Exception as e:
+    except Exception:
         logger.exception(f"Error deleting {renderer.model_name}/{renderer.item_id}")
         raise HTTPException(
             status_code=500, detail="Internal server error during deletion."
@@ -418,7 +417,7 @@ async def get_select_options(
         from fastapi.responses import JSONResponse
 
         return JSONResponse(content=options_list)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500)
 
 
@@ -458,7 +457,7 @@ async def update_inline_field(
         raw_value_from_json = json_data[field_name]
     except Exception:
         return HTMLResponse(
-            f'<div class="text-danger p-1">Error: invalid JSON.</div>', status_code=400
+            '<div class="text-danger p-1">Error: invalid JSON.</div>', status_code=400
         )
 
     manager = dam_factory.get_manager(model_name, request=request)
@@ -529,7 +528,7 @@ async def update_inline_field(
         return await error_renderer.render_field_to_response(
             field_name, status_code=e.status_code
         )
-    except Exception as e:
+    except Exception:
         logger.exception(
             f"Unexpected error during inline update of {model_name}.{field_name}"
         )

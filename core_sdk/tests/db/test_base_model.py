@@ -2,15 +2,13 @@
 import pytest
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional
 import asyncio
 
-from sqlmodel import SQLModel, Field, select
+from sqlmodel import Field, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
 
 from core_sdk.db.base_model import BaseModelWithMeta
-from core_sdk.tests.conftest import db_session
 
 pytestmark = pytest.mark.asyncio
 

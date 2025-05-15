@@ -2,20 +2,16 @@
 import logging
 from typing import (
     Type,
-    List,
     Optional,
     Any,
     Mapping,
     Dict,
     Union,
-    cast,
-    Literal,
-    TypeVar
+    Literal
 )
 from uuid import UUID
 
-from pydantic import BaseModel as PydanticBaseModel, ValidationError, HttpUrl
-from sqlmodel import SQLModel
+from pydantic import BaseModel as PydanticBaseModel, ValidationError
 import httpx
 from fastapi import HTTPException
 

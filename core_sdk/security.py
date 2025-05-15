@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 # Используем абсолютные импорты в рамках SDK или внешних библиотек
 from jose import jwt, JWTError

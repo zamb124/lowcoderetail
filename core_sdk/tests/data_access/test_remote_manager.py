@@ -3,7 +3,6 @@ import pytest
 import httpx
 import uuid
 import json
-from typing import List, Optional, Dict, Any
 
 import pytest_asyncio
 from pydantic import HttpUrl
@@ -12,7 +11,6 @@ from respx import MockRouter
 
 from core_sdk.registry import RemoteConfig # RemoteConfig нужен для фикстуры
 from core_sdk.data_access.remote_manager import RemoteDataAccessManager
-from core_sdk.exceptions import ServiceCommunicationError, ConfigurationError
 from fastapi import HTTPException
 
 # Используем ItemRead как model_cls для RemoteDataAccessManager,

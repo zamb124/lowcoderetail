@@ -1,11 +1,9 @@
 # core_sdk/tests/data_access/test_local_manager.py
 import pytest
 import uuid
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 
-import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField, ValidationError # PydanticBaseModel для схем
 from starlette.exceptions import HTTPException
 
 from core_sdk.data_access.local_manager import LocalDataAccessManager

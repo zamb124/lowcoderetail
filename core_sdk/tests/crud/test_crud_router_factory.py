@@ -1,15 +1,13 @@
 # core_sdk/tests/crud/test_crud_router_factory.py
 import pytest
 import uuid
-from typing import List, Optional, Type, Any
+from typing import Any
 from unittest import mock
 
-from fastapi import FastAPI, Depends, HTTPException, status, APIRouter
+from fastapi import FastAPI, Depends, APIRouter
 from fastapi.testclient import TestClient
-from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField, ConfigDict
 
 from core_sdk.crud.factory import CRUDRouterFactory
-from core_sdk.registry import ModelRegistry
 from core_sdk.data_access import (
     BaseDataAccessManager,
     DataAccessManagerFactory,
@@ -17,26 +15,15 @@ from core_sdk.data_access import (
 )
 from core_sdk.exceptions import ConfigurationError
 from core_sdk.filters.base import DefaultFilter  # Импортируем наш DefaultFilter
-from core_sdk.schemas.pagination import PaginatedResponse
-from fastapi_filter.contrib.sqlalchemy import (
-    Filter as BaseSQLAlchemyFilter,
-)  # Для issubclass
-from sqlmodel import SQLModel, Field as SQLModelField
 
 # Используем тестовые модели и схемы из общего conftest.py для SDK
 from core_sdk.tests.conftest import (
-    Item,
-    ItemCreate,
-    ItemUpdate,
-    ItemRead,
-    ItemFilter,
     CrudFactoryItem,
     CrudFactoryItemCreate,
     CrudFactoryItemUpdate,
     CrudFactoryItemRead,
     CrudFactoryItemFilter,  # Используем эти для тестов CRUD factory
     CrudSimpleItem,
-    CrudSimpleItemRead,
 )
 
 pytestmark = pytest.mark.asyncio

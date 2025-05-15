@@ -292,7 +292,7 @@ class ViewRenderer:
                     )
             else:
                 logger.warning(
-                    f"Cannot prepare field for TABLE_CELL: item or field_to_focus missing."
+                    "Cannot prepare field for TABLE_CELL: item or field_to_focus missing."
                 )
 
         elif self.item:  # Для VIEW, EDIT, CREATE, FILTER_FORM

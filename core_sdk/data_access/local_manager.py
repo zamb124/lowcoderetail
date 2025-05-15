@@ -9,17 +9,15 @@ from typing import (
     Dict,
     Union,
     Literal,
-    ClassVar,
-    TypeVar
+    ClassVar
 )
 from uuid import UUID
 import re
 
 from pydantic import BaseModel as PydanticBaseModel, ValidationError
-from sqlmodel import SQLModel, col, select as sqlmodel_select
+from sqlmodel import col, select as sqlmodel_select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func
 from fastapi import HTTPException
 
 # SDK Импорты
@@ -158,7 +156,7 @@ class LocalDataAccessManager(BaseDataAccessManager[DM_SQLModelType, DM_CreateSch
             result = await session.execute(statement)
             items_from_db_raw = list(result.scalars().all())
             count = len(items_from_db_raw)
-        except Exception as e:
+        except Exception:
             logger.exception(f"Error executing list query for {self.model_name}")
             raise HTTPException(status_code=500, detail="Database error during list operation.")
         output_next_cursor: Optional[int] = None
@@ -266,7 +264,7 @@ class LocalDataAccessManager(BaseDataAccessManager[DM_SQLModelType, DM_CreateSch
                 await session.rollback()
                 self._handle_integrity_error(e, context="delete")
                 return False
-            except Exception as e:
+            except Exception:
                 await session.rollback()
                 logger.exception(f"Failed to delete {self.model_cls.__name__} due to internal error.")
                 raise HTTPException(status_code=500, detail=f"Failed to delete {self.model_cls.__name__} due to internal error.")

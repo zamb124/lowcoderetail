@@ -7,9 +7,8 @@ from starlette.requests import Request
 
 # fastapi.Depends не используется напрямую в этом файле, но может быть нужен вызывающему коду.
 # Если он здесь не нужен, его можно убрать. Пока оставим, т.к. get_dam_factory его использует.
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 
-from exceptions import ConfigurationError
 
 logger = logging.getLogger(__name__)  # Имя будет core_sdk.data_access.common
 

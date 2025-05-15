@@ -21,8 +21,7 @@ from fastapi_filter.contrib.sqlalchemy import (
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from core_sdk.data_access.local_manager import LocalDataAccessManager
-    from core_sdk.data_access.base_manager import BaseDataAccessManager, ReadSchemaType_co
+    pass
 
 logger = logging.getLogger("core_sdk.registry")
 

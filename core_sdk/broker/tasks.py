@@ -196,7 +196,7 @@ async def execute_dam_operation(
             # Ошибки, связанные с получением менеджера или метода
             logger.error(f"Setup error in worker task: {e}", exc_info=True)
             raise  # Перевыбрасываем, чтобы Taskiq пометил задачу как ошибочную
-        except Exception as e:
+        except Exception:
             # Все остальные исключения, включая те, что пришли из actual_method (DAM)
             # (например, HTTPException, ValidationError, IntegrityError из DAM).
             # Taskiq должен обработать их как ошибку задачи.

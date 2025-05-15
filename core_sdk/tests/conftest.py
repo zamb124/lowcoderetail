@@ -1,22 +1,13 @@
 # core_sdk/tests/conftest.py
-import asyncio
-import contextvars
 import contextlib # Добавил, если используется где-то неявно
 import os
-import sys
 from typing import (
     AsyncGenerator,
-    Generator,
-    Type,
     Dict,
     Any,
-    Optional as TypingOptional, # Переименовал, чтобы не конфликтовать с Optional из typing
     List as TypingList, # Переименовал
     Optional, # Стандартный Optional
-    Union,
-    Literal,
-    Mapping,
-    TypeVar # Добавил TypeVar
+     # Добавил TypeVar
 )
 from unittest import mock
 
@@ -32,7 +23,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from sqlmodel import SQLModel, Field as SQLModelField
-from pydantic import BaseModel as PydanticBaseModel, ConfigDict, HttpUrl, Field as PydanticField
+from pydantic import BaseModel as PydanticBaseModel, ConfigDict, HttpUrl
 
 from core_sdk.db import session as sdk_db_session_module
 from core_sdk.db.session import (
@@ -41,12 +32,10 @@ from core_sdk.db.session import (
     # init_db as sdk_init_db_func, # Не используется напрямую
     # close_db as sdk_close_db_func, # Не используется напрямую
 )
-from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
-from core_sdk.data_access.base_manager import BaseDataAccessManager, DM_CreateSchemaType, DM_UpdateSchemaType, DM_ReadSchemaType, DM_SQLModelType
+from core_sdk.registry import ModelRegistry, RemoteConfig
 from core_sdk.data_access.local_manager import LocalDataAccessManager
 from core_sdk.data_access.manager_factory import DataAccessManagerFactory
 from core_sdk.filters.base import DefaultFilter
-from fastapi_filter.contrib.sqlalchemy import Filter as BaseSQLAlchemyFilter
 from core_sdk.config import BaseAppSettings
 from taskiq import AsyncBroker
 import logging

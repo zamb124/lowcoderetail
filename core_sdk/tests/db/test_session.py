@@ -2,10 +2,9 @@
 import pytest
 import asyncio
 from unittest import mock
-from typing import AsyncGenerator, Optional
+from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, async_sessionmaker
-from sqlalchemy.exc import OperationalError
 from sqlmodel import SQLModel
 
 import core_sdk.db.session as sdk_db_session_module

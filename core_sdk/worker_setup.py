@@ -81,7 +81,7 @@ async def initialize_worker_context(
             )
             # Решите, критично ли это для воркера
             # raise RuntimeError(f"Failed to import registry config module: {registry_config_module}")
-        except Exception as e:
+        except Exception:
             logger.error(
                 f"Error configuring ModelRegistry from module {registry_config_module}.",
                 exc_info=True,
@@ -100,7 +100,7 @@ async def initialize_worker_context(
             # Примечание: явный вызов rebuild для схем с ForwardRefs вне реестра
             # должен выполняться в коде инициализации конкретного воркера, если необходимо.
             logger.info("Pydantic/SQLModel models rebuild complete for worker.")
-        except Exception as e:
+        except Exception:
             logger.error(
                 "Error during Pydantic/SQLModel model rebuild for worker.",
                 exc_info=True,

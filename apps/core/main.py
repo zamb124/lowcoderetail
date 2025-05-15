@@ -1,7 +1,6 @@
 # core/app/main.py
 import logging
 import os
-from core_sdk.registry import ModelRegistry # TODO: надо понять как  обойти этот импорт мб в конфиг перенести(
 # Импортируем фабрику создания приложения из SDK
 from core_sdk.app_setup import create_app_with_sdk_setup
 

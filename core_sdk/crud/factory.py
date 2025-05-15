@@ -1,10 +1,10 @@
 # core_sdk/crud/factory.py
 import logging
-from typing import Type, List, Optional, Any, Union, Dict, TypeVar, cast, ClassVar
+from typing import Type, List, Optional, TypeVar, cast, ClassVar
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body, Path, status
-from pydantic import BaseModel, create_model, ValidationError, ConfigDict
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, status
+from pydantic import BaseModel, ValidationError, ConfigDict
 from sqlmodel import SQLModel
 
 from core_sdk.registry import ModelRegistry, ModelInfo

@@ -1,19 +1,17 @@
 # core_sdk/data_access/broker_proxy.py
 import functools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, List, Type
+from typing import TYPE_CHECKING, Any, Optional, Type
 from uuid import UUID
 from pydantic import BaseModel, ValidationError
 from sqlmodel import SQLModel
 
-from core_sdk.broker.setup import broker
 from core_sdk.broker.tasks import execute_dam_operation
 from core_sdk.exceptions import ConfigurationError, CoreSDKError
 from taskiq import TaskiqResult, TaskiqError, TaskiqResultTimeoutError
 
 if TYPE_CHECKING:
     from core_sdk.data_access.base_manager import BaseDataAccessManager
-    from taskiq import AsyncTaskiqDecoratedTask
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +139,7 @@ class BrokerTaskProxy:
             try:
                 if not hasattr(execute_dam_operation, "kiq"):
                     logger.critical(
-                        f"Imported task 'execute_dam_operation' has no '.kiq' method. Taskiq setup issue?"
+                        "Imported task 'execute_dam_operation' has no '.kiq' method. Taskiq setup issue?"
                     )
                     raise AttributeError(
                         "Imported task 'execute_dam_operation' has no '.kiq' method. Taskiq might not be configured correctly."
@@ -229,7 +227,7 @@ class BrokerTaskProxy:
                     exc_info=True,
                 )
                 raise
-            except Exception as e:
+            except Exception:
                 logger.exception(
                     f"BrokerProxy: Unexpected error in task_kicker for '{name}'."
                 )

@@ -3,7 +3,6 @@ import os
 
 from pydantic_settings import (
     BaseSettings,
-    SettingsConfigDict,
 )  # Импортируем SettingsConfigDict для v2
 from pydantic import Field, PostgresDsn
 from typing import List

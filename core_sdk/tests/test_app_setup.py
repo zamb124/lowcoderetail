@@ -1,15 +1,12 @@
 # core_sdk/tests/test_app_setup.py
 import pytest
-import httpx
 from unittest import mock  # Оставляем mock
-from typing import List, Optional, Callable, Awaitable, Type, Sequence
 
 from fastapi import FastAPI, APIRouter as FastAPIAPIRouter
 from fastapi.testclient import TestClient
 from pydantic import BaseModel as PydanticBaseModel  # <--- ДОБАВЛЕН ИМПОРТ
 
 from core_sdk.app_setup import create_app_with_sdk_setup  # Тестируемая функция
-from core_sdk.config import BaseAppSettings
 from core_sdk.registry import ModelRegistry
 # Пути для патчинга:
 # import core_sdk.broker.setup as broker_setup_module # Неправильно, нужно патчить там, где используется
@@ -19,19 +16,7 @@ from core_sdk.registry import ModelRegistry
 # Используем фикстуру настроек из conftest
 from .conftest import (
     AppSetupTestSettings,
-    app_setup_settings,
 )  # app_setup_settings уже фикстура
-from .conftest import (
-    mock_before_startup,
-    mock_after_startup,
-    mock_before_shutdown,
-    mock_after_shutdown,
-    mock_broker,
-    mock_model_registry_rebuild,
-    mock_sdk_init_db,
-    mock_sdk_close_db,
-    mock_app_http_client_lifespan_cm,
-)
 
 # --- Тесты для create_app_with_sdk_setup ---
 

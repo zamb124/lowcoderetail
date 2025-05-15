@@ -4,8 +4,7 @@ from datetime import datetime, timedelta, timezone
 import uuid  # Для user_id в токенах
 from typing import Dict, Any
 
-from jose import jwt, JWTError  # Для проверки типов ошибок JWT
-from passlib.exc import InvalidHashError  # Для проверки ошибок passlib
+from jose import jwt  # Для проверки типов ошибок JWT
 
 from core_sdk.security import (
     verify_password,

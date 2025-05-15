@@ -6,11 +6,10 @@ import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select as sqlmodel_select, func, SQLModel # SQLModel для DM_SQLModelType
+from sqlmodel import select as sqlmodel_select, func # SQLModel для DM_SQLModelType
 
-from core_sdk.data_access.local_manager import LocalDataAccessManager, DM_SQLModelType # Используем DM_SQLModelType
+from core_sdk.data_access.local_manager import LocalDataAccessManager # Используем DM_SQLModelType
 from core_sdk.security import get_password_hash, verify_password
-from core_sdk.exceptions import CoreSDKError
 
 from apps.core import models as core_models
 from apps.core import schemas as core_schemas
@@ -100,7 +99,7 @@ class UserDataAccessManager(
                 await self.session.commit()
                 await self.session.refresh(user, attribute_names=["last_login"])
             except Exception: logger.exception(f"Error committing last_login update for user {user.email}.")
-        else: logger.warning(f"User model does not have 'last_login' attribute.")
+        else: logger.warning("User model does not have 'last_login' attribute.")
 
     async def assign_to_group(self, user_id: UUID, group_id: UUID) -> core_models.user.User: # Возвращает SQLModel
         logger.info(f"UserDataAccessManager: Assigning user {user_id} to group {group_id}.")

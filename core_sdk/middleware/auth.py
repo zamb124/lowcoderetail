@@ -61,7 +61,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 # Считаем точным путем
                 self.allowed_exact_paths.add(path)
 
-        logger.debug(f"AuthMiddleware initialized.")
+        logger.debug("AuthMiddleware initialized.")
         logger.debug(f"  Allowed exact paths: {sorted(list(self.allowed_exact_paths))}")
         logger.debug(f"  Allowed prefixes: {sorted(list(self.allowed_prefixes))}")
         logger.debug(f"  Allowed patterns: {sorted(list(self.allowed_patterns))}")

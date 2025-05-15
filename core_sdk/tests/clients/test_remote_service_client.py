@@ -5,16 +5,14 @@ import pytest
 import httpx
 import uuid
 import json
-from typing import Optional, List, Dict, Any, cast  # Добавил cast
 
 import pytest_asyncio
-from pydantic import HttpUrl, BaseModel as PydanticBaseModel
+from pydantic import HttpUrl
 
 from respx import MockRouter
 
 from core_sdk.clients.base import RemoteServiceClient
-from core_sdk.exceptions import ServiceCommunicationError, ConfigurationError
-from fastapi import HTTPException  # Для проверки типов исключений в тестах DAM
+from core_sdk.exceptions import ServiceCommunicationError
 
 # Используем тестовые модели из conftest основного data_access
 # Убедитесь, что Item.id в conftest.py это uuid.UUID
@@ -22,7 +20,6 @@ from core_sdk.tests.conftest import (
     Item as TestItemModel,
     ItemCreate,
     ItemUpdate,
-    ItemRead,
 )
 
 pytestmark = pytest.mark.asyncio

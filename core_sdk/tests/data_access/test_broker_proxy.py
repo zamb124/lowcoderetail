@@ -1,13 +1,11 @@
 # core_sdk/tests/data_access/test_broker_proxy.py
 import pytest
 import uuid
-import json
-from typing import List, Dict, Any, Optional, Union, Literal, Mapping, TypeVar
-from pydantic import BaseModel as PydanticBaseModel, Field as PydanticField
-from sqlmodel import SQLModel, Field as SQLModelField
+from typing import Dict, Any, Optional
+from pydantic import BaseModel as PydanticBaseModel
 from unittest import mock
 from uuid import UUID
-from taskiq import TaskiqResult, TaskiqError, TaskiqResultTimeoutError
+from taskiq import TaskiqError, TaskiqResultTimeoutError
 
 from core_sdk.data_access.broker_proxy import (
     _serialize_arg,
@@ -15,10 +13,8 @@ from core_sdk.data_access.broker_proxy import (
     BrokerTaskProxy,
 )
 from core_sdk.broker.tasks import execute_dam_operation
-from core_sdk.data_access.base_manager import BaseDataAccessManager, DM_CreateSchemaType, DM_UpdateSchemaType, DM_ReadSchemaType, DM_SQLModelType
-from core_sdk.registry import ModelRegistry
+from core_sdk.data_access.base_manager import BaseDataAccessManager
 from core_sdk.exceptions import CoreSDKError
-from core_sdk.filters.base import DefaultFilter
 
 from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemRead
 

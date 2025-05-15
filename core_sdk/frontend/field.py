@@ -1,7 +1,7 @@
 # core_sdk/frontend/field.py
 import uuid
 import inspect
-from typing import Any, Optional, Dict, TYPE_CHECKING, Type, List, Tuple
+from typing import Any, Optional, Dict, TYPE_CHECKING, List, Tuple
 from pydantic.fields import FieldInfo as PydanticFieldInfo
 from pydantic import BaseModel
 from enum import Enum
@@ -11,7 +11,6 @@ from .config import (
     DEFAULT_FIELD_TEMPLATES,
     DEFAULT_READONLY_FIELDS_IN_EDIT,
 )
-from .exceptions import FieldTypeError  # Убедитесь, что этот импорт корректен
 from .utils import (
     get_base_type,
     is_list_type,
@@ -146,7 +145,7 @@ class SDKField:
                 )
         elif base_type is bool:
             field_render_type = "switch"
-            logger.debug(f"  Type set to 'switch' for bool type")
+            logger.debug("  Type set to 'switch' for bool type")
         elif related_model_for_id_resolution:
             if base_type is uuid.UUID or type_name_for_mapping == "UUID":
                 field_render_type = "relation"
@@ -217,7 +216,7 @@ class SDKField:
 
         if field_render_type == "default":
             field_render_type = "text"
-            logger.debug(f"  Final fallback type set to 'text'")
+            logger.debug("  Final fallback type set to 'text'")
 
         self._field_type = field_render_type
         template_config = DEFAULT_FIELD_TEMPLATES.get(

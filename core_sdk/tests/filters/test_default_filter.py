@@ -2,7 +2,7 @@
 import uuid
 
 import pytest
-from typing import Optional, List, Type, Union
+from typing import Optional, List, Union
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone  # Добавил timezone
 

@@ -6,9 +6,8 @@ from fastapi import Depends
 import httpx
 from sqlmodel import SQLModel
 from starlette.requests import Request as StarletteRequest
-from fastapi import Request as FastAPIRequest
 
-from core_sdk.data_access.base_manager import BaseDataAccessManager, DM_ReadSchemaType, DM_SQLModelType # Импортируем новые дженерики
+from core_sdk.data_access.base_manager import BaseDataAccessManager # Импортируем новые дженерики
 from core_sdk.data_access.local_manager import LocalDataAccessManager
 from core_sdk.data_access.remote_manager import RemoteDataAccessManager
 from core_sdk.data_access.common import get_optional_token, get_global_http_client
@@ -16,7 +15,7 @@ from core_sdk.exceptions import ConfigurationError
 from pydantic import BaseModel as PydanticBaseModel
 
 if TYPE_CHECKING:
-    from core_sdk.registry import ModelRegistry, RemoteConfig, ModelInfo
+    pass
 
 logger = logging.getLogger("core_sdk.data_access.manager_factory")
 

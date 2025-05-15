@@ -2,17 +2,14 @@
 import pytest
 import os
 from unittest import mock
-import importlib
-from typing import Optional, Dict, Any
+from typing import Dict
 
 from core_sdk.worker_setup import initialize_worker_context, shutdown_worker_context
-from core_sdk.config import BaseAppSettings
 from core_sdk.registry import ModelRegistry
 
 # Используем фикстуры и модели из общего conftest SDK
 from core_sdk.tests.conftest import (
     AppSetupTestSettings,
-    worker_settings, # Алиас для app_setup_settings
     Item, # SQLModel
     ItemRead # Pydantic ReadSchema
 )

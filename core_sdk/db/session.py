@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool, NullPool  # Импортируем типы пулов для проверки
 from sqlmodel import SQLModel
-from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ async def close_db():
         try:
             await _db_engine.dispose()
             logger.info("Database engine disposed successfully.")
-        except Exception as e:
+        except Exception:
             logger.error("Error during database engine disposal.", exc_info=True)
         finally:
             _db_engine = None
@@ -183,5 +182,5 @@ async def create_db_and_tables():
         async with _db_engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)
         logger.info("Database tables checked/created successfully using global engine.")
-    except Exception as e:
+    except Exception:
         logger.critical("Failed to create database tables.", exc_info=True)

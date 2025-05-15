@@ -3,7 +3,7 @@
 import pycountry
 from babel import Locale, UnknownLocaleError
 from babel.numbers import list_currencies
-from typing import List, Dict, Optional
+from typing import List, Optional
 
 # --- ИЗМЕНЕНИЕ: Импортируем схемы из локального модуля schemas ---
 from ..schemas import i18n as i18n_schemas

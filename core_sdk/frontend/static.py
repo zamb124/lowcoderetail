@@ -19,7 +19,7 @@ def mount_static_files(app: FastAPI):
         logger.info(
             f"SDK static files mounted at '{STATIC_URL_PATH}' from directory '{STATIC_DIR}'."
         )
-    except Exception as e:
+    except Exception:
         logger.exception(
             f"Failed to mount SDK static files from '{STATIC_DIR}' at '{STATIC_URL_PATH}'."
         )

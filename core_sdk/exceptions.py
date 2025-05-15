@@ -44,7 +44,7 @@ class ServiceCommunicationError(CoreSDKError):
         self.status_code = status_code
         self.url = url
         # Формируем полное сообщение для вывода
-        full_message = f"Service Communication Error"
+        full_message = "Service Communication Error"
         if self.url:
             full_message += f" accessing {self.url}"
         if self.status_code:

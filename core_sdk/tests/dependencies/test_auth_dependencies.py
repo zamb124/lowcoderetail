@@ -5,7 +5,7 @@ import pytest
 import uuid
 from unittest import mock
 
-from fastapi import Request, HTTPException, Depends
+from fastapi import Request, HTTPException
 from starlette.datastructures import Headers
 
 from core_sdk.dependencies.auth import (

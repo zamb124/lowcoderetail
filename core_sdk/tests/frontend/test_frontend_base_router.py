@@ -2,20 +2,18 @@
 import pytest
 import uuid
 from unittest import mock
-from typing import Optional, Any, Dict, List
+from typing import Optional, Any
 
-from fastapi import FastAPI, Request as FastAPIRequest, Depends, HTTPException as FastAPIHTTPException, Path as FastAPIPath
+from fastapi import FastAPI, Request as FastAPIRequest, HTTPException as FastAPIHTTPException, Path as FastAPIPath
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
-from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core_sdk.frontend.base import router as frontend_router
-from core_sdk.frontend.renderer import ViewRenderer, RenderContext, FieldRenderContext, RenderMode
+from core_sdk.frontend.renderer import ViewRenderer, RenderMode
 from core_sdk.frontend.templating import initialize_templates, SDK_TEMPLATES_DIR
 from core_sdk.data_access import DataAccessManagerFactory, BaseDataAccessManager, get_dam_factory
-from core_sdk.registry import ModelRegistry, ModelInfo
-from core_sdk.schemas.auth_user import AuthenticatedUser
-from core_sdk.exceptions import RenderingError, ConfigurationError
+from core_sdk.registry import ModelRegistry
+from core_sdk.exceptions import ConfigurationError
 from core_sdk.tests.conftest import Item, ItemCreate, ItemUpdate, ItemFilter
 
 from core_sdk.middleware.auth import AuthMiddleware

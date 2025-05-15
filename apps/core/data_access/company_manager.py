@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from core_sdk.exceptions import CoreSDKError
-from core_sdk.data_access.local_manager import LocalDataAccessManager, DM_SQLModelType
+from core_sdk.data_access.local_manager import LocalDataAccessManager
 
 from apps.core import models as core_models
 from apps.core import schemas as core_schemas

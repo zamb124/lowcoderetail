@@ -1,18 +1,16 @@
 # core_sdk/app_setup.py
 import logging
 from contextlib import asynccontextmanager, AsyncExitStack
-from typing import List, Optional, Callable, Any, Sequence, Dict, Awaitable, Type
+from typing import List, Optional, Callable, Sequence, Awaitable, Type
 
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, status
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel, select as sqlmodel_select
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
 # Импорты из SDK
 from core_sdk.broker.setup import broker
-from core_sdk.db.session import init_db, managed_session, close_db, get_current_session
+from core_sdk.db.session import init_db, close_db
 from core_sdk.registry import ModelRegistry
 
 # --- ИМПОРТИРУЕМ AuthMiddleware ---
@@ -21,10 +19,7 @@ from core_sdk.middleware.auth import AuthMiddleware
 # ----------------------------------
 from core_sdk.middleware.middleware import DBSessionMiddleware
 from core_sdk.config import BaseAppSettings
-from core_sdk.exceptions import CoreSDKError, ConfigurationError
 from core_sdk.data_access import (
-    DataAccessManagerFactory,
-    BaseDataAccessManager,
     app_http_client_lifespan,
 )
 from data_access.common import app_http_client_lifespan
@@ -106,7 +101,7 @@ async def sdk_lifespan_manager(
                         logger.warning(
                             "SDK Lifespan: Taskiq broker does not have a shutdown method."
                         )
-                except Exception as e:
+                except Exception:
                     logger.error(
                         "SDK Lifespan: Failed to start Taskiq broker.", exc_info=True
                     )
@@ -153,7 +148,7 @@ async def sdk_lifespan_manager(
                         f"Finished explicitly rebuilding {rebuilt_count} schemas."
                     )
                 logger.info("SDK Lifespan: Models rebuild complete.")
-            except Exception as e:
+            except Exception:
                 logger.error("SDK Lifespan: Error during model rebuild.", exc_info=True)
         else:
             logger.info("SDK Lifespan: Skipping model rebuild.")
