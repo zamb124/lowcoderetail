@@ -233,15 +233,11 @@ class ViewRenderer:
             direction = self.query_params.get("direction", "asc")
             if direction not in ["asc", "desc"]:
                 direction = "asc"
-            self.items = await self.manager.list(
+            _pagination_items = await self.manager.list(
                 cursor=cursor, limit=limit, filters=dam_filters, direction=direction
             )
-            self.pagination = {
-                "next_cursor": self.items[-1].lsn if self.items else None,
-                "limit": limit,
-                "count": len(self.items),
-                "direction": direction,
-            }
+            self.items = _pagination_items.get("items", [])
+            return _pagination_items
         logger.debug(
             f"Data loaded by _load_data: item={self.item is not None}, items_count={len(self.items) if self.items else 'N/A'}"
         )

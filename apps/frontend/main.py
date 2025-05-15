@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 # --- SDK Imports ---
 from core_sdk.app_setup import create_app_with_sdk_setup
 from core_sdk.registry import ModelRegistry
+from . import registry_config  # noqa F401
 from core_sdk.frontend import (
     mount_static_files,
     initialize_templates,
@@ -16,7 +17,7 @@ from core_sdk.frontend import (
 
 # --- Frontend Service Imports ---
 from .config import settings
-from . import registry_config  # noqa F401
+
 from .api import bff_api_router  # Импортируем главный роутер
 
 # --- Настройка логгирования ---
