@@ -1,41 +1,31 @@
 {# core_sdk/frontend/templates/components/form.html #}
-{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
-{# Этот шаблон ТЕПЕРЬ СНОВА СОДЕРЖИТ тег <form> и является самодостаточным компонентом формы. #}
-{# Он будет вставлен в .modal-body или на обычную страницу. #}
+{# Ожидает: ctx (RenderContext с component_mode=EDIT_FORM или CREATE_FORM), request, user, SDK_STATIC_URL, url_for #}
 
-{% set form_action_url = url_for('update_item', model_name=ctx.model_name, item_id=ctx.item_id) if ctx.mode == 'edit' else url_for('create_item', model_name=ctx.model_name) %}
-{% set form_method = 'put' if ctx.mode == 'edit' else 'post' %}
+{% set form_action_url = url_for('update_item', model_name=ctx.model_name, item_id=ctx.item_id) if ctx.component_mode == 'edit_form' else url_for('create_item', model_name=ctx.model_name) %}
+{% set form_method = 'put' if ctx.component_mode == 'edit_form' else 'post' %}
 
-{# Определяем, загружен ли этот контент в модальное окно Bootstrap #}
 {% set is_inside_modal_context = request.headers.get("HX-Target") and
                                  ( ("#modal-placeholder" in request.headers.get("HX-Target")) or
                                    (".modal-body" in request.headers.get("HX-Target")) or
                                    (".modal-content" in request.headers.get("HX-Target"))
                                  )
-                                 or (ctx.html_id and ("modal-form-" in ctx.html_id or "modal-view-" in ctx.html_id )) %}
+                                 or (ctx.html_id and ("modal-form-" in ctx.html_id)) %}
 
-<form id="{{ ctx.html_id }}" {# Уникальный ID для этой формы #}
+<form id="{{ ctx.html_id }}"
       hx-{{ form_method }}="{{ form_action_url }}"
       hx-ext="json-enc"
-      {# При ошибке валидации (422), сервер вернет этот же form.html с ошибками. #}
-      {# HTMX заменит этот <form> (из-за hx-swap="outerHTML") новым <form> с ошибками. #}
       hx-target="this"
       hx-swap="outerHTML"
-      class="form-component-wrapper" {# Можно убрать, если не используется #}
+      class="form-component-wrapper"
       ui_key="{{ ctx.model_name }}--{{ ctx.item_id if ctx.item_id else 'new' }}"
       data-lsn="{{ ctx.item.lsn if ctx.item and ctx.item.lsn else '0' }}">
-
-    {# Заголовок формы, если он нужен (например, если это не в модалке, где заголовок внешний) #}
-    {# {% if not is_inside_modal_context %} #}
-    {# <h3 class="mb-4">{{ ctx.title }}</h3> #}
-    {# {% endif %} #}
 
     {# Отображение общих ошибок формы #}
     {% if ctx.errors and ctx.errors._form %}
         <div class="alert alert-danger d-flex align-items-center p-4 mb-5">
-            <i class="ki-duotone ki-information-5 fs-2hx text-danger me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+            <i class="ti ti-alert-triangle fs-2hx text-danger me-3"></i> {# Изменил иконку #}
             <div class="d-flex flex-column">
-                <h5 class="mb-1 text-danger">Ошибка</h5>
+                <h5 class="mb-1 text-danger">Ошибка сохранения</h5> {# Изменил заголовок #}
                 <span>
                     {% if ctx.errors._form is iterable and ctx.errors._form is not string %}
                         {{ ctx.errors._form | join('<br>') | safe }}
@@ -47,12 +37,11 @@
         </div>
     {% endif %}
 
-    {# Отображение полей (каждое поле теперь form-floating, если применимо) #}
-    {% for field_ctx_loopvar in ctx.fields %}
-         {% set field_errors = ctx.errors.get(field_ctx_loopvar.name) if ctx.errors and ctx.errors is mapping else None %}
-         {% set current_field_ctx = field_ctx_loopvar.model_copy(update={'errors': field_errors}) %}
-         {% with field_ctx=current_field_ctx, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for, ctx=ctx %}
-            {% include current_field_ctx.template_path %}
+    {# Отображение полей #}
+    {% for current_field_ctx_from_loop in ctx.fields %}
+         {# current_field_ctx_from_loop.state здесь FieldState.EDIT #}
+         {% with field_ctx=current_field_ctx_from_loop, component_ctx=ctx, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+            {% include "components/_field_layout_wrapper.html" %}
          {% endwith %}
     {% endfor %}
 
@@ -60,23 +49,21 @@
     <div class="pt-5 mt-3 border-top">
         <div class="d-flex justify-content-end">
             {% if is_inside_modal_context %}
-                {# Эта кнопка "Отмена" закроет модалку Bootstrap #}
                 <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Отмена</button>
-            {% elif ctx.mode == 'edit' %}
-                {# Эта кнопка "Отмена" для немодальной формы редактирования, вернет view #}
+            {% elif ctx.component_mode == 'edit_form' %}
                 <button type="button" class="btn btn-light me-3"
-                        hx-get="{{ url_for('get_view', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                        hx-target="#{{ ctx.html_id }}" {# Заменяем эту форму (this) на view #}
+                        hx-get="{{ url_for('get_view_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
+                        hx-target="#{{ ctx.html_id }}"
                         hx-swap="outerHTML">
                     Отмена
                 </button>
-            {% else %} {# Режим CREATE на отдельной странице #}
-                <a href="{{ url_for('get_list_view', model_name=ctx.model_name) }}" class="btn btn-light me-3">
+            {% else %}
+                <a href="{{ url_for('get_list_table', model_name=ctx.model_name) if 'get_list_table' in request.app.router.routes_by_name else '#' }}" class="btn btn-light me-3">
                     Отмена
                 </a>
             {% endif %}
 
-            <button type="submit" class="btn btn-primary"> {# Атрибут form="" больше не нужен #}
+            <button type="submit" class="btn btn-primary">
                  <span class="indicator-label">Сохранить</span>
                  <span class="indicator-progress d-none">Пожалуйста, подождите...
                      <span class="spinner-border spinner-border-sm align-middle ms-2"></span>

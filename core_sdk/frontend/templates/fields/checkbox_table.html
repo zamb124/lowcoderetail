@@ -1,9 +1,0 @@
-{# core_sdk/frontend/templates/fields/checkbox_table.html #}
-{# Ожидает: field_ctx (FieldRenderContext) #}
-{% if field_ctx.value == True %} {# Явная проверка на True #}
-    <div class="form-check form-switch mb-2"><input type="checkbox" class="form-check-input input-primary" id="customswitchv1-1" checked="checked"> <label class="form-check-label" for="customswitchv1-1">primary</label></div>
-{% elif field_ctx.value == False %} {# Явная проверка на False #}
-     <div class="form-check form-switch mb-2"><input type="checkbox" class="form-check-input input-primary" id="customswitchv1-1"> <label class="form-check-label" for="customswitchv1-1">primary</label></div>
-{% else %}
-     <span class="text-muted" title="Нет данных">-</span> {# Для None или других неопределенных значений #}
-{% endif %}

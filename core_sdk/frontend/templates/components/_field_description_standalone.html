@@ -1,0 +1,7 @@
+{# core_sdk/frontend/templates/components/_field_description_standalone.html #}
+{# Ожидает: field_ctx (FieldRenderContext) #}
+{% if field_ctx.description %}
+    <div id="{{ field_ctx.html_id }}_help" class="form-text text-muted mt-1">
+        {{ field_ctx.description }}
+    </div>
+{% endif %}

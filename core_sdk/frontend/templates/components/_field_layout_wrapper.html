@@ -1,0 +1,69 @@
+{# core_sdk/frontend/templates/components/_field_layout_wrapper.html #}
+{# Ожидает: field_ctx, component_ctx #}
+{#           item (Pydantic ReadSchema - передается из _table_cell.html или является component_ctx.item для VIEW_FORM) #}
+{#           model_name (передается из _table_cell.html или является component_ctx.model_name для VIEW_FORM) #}
+{#           request, user, SDK_STATIC_URL, url_for #}
+
+{% set use_form_floating = component_ctx.component_mode in ['view_form', 'edit_form', 'create_form', 'filter_form'] and
+                           field_ctx.field_type not in ['switch', 'checkbox', 'json', 'list_simple', 'list_relation'] %}
+{% set field_instance_id = field_ctx.html_id ~ "-instance" %}
+
+{# Определяем item_id для URL. Для VIEW_FORM это component_ctx.item_id. #}
+{# Для TABLE_CELL это item.id (где item передан из _table_row). #}
+{% set current_item_id_for_url = item.id if item and item.id else component_ctx.item_id %}
+{% set current_model_name_for_url = model_name if model_name else component_ctx.model_name %}
+{% set effective_parent_mode_for_url = click_to_edit_parent_mode | default(component_ctx.component_mode.value) %}
+
+<div id="{{ field_instance_id }}"
+     class="field-layout-wrapper field-type-{{ field_ctx.field_type }} field-state-{{ field_ctx.state.value }}
+            {% if field_ctx.errors %}has-error{% endif %}
+            {% if field_ctx.is_readonly %}is-readonly{% endif %}
+            {% if field_ctx.is_editable_context and field_ctx.state == 'view' %}is-clickable-to-edit{% endif %}"
+     {% if field_ctx.state == 'edit' and field_ctx.is_editable_context and current_item_id_for_url and
+           (component_ctx.component_mode == 'table_cell' or component_ctx.component_mode == 'view_form') %}
+         hx-trigger="keyup[key=='Escape'] from:body"
+         hx-get="{{ url_for('get_field_fragment', parent_mode=component_ctx.component_mode.value, model_name=current_model_name_for_url, item_id=current_item_id_for_url, field_name=field_ctx.name) }}?field_state={{ 'view' }}"
+         hx-target="this"
+         hx-swap="outerHTML"
+     {% endif %}
+     >
+
+    {% if use_form_floating %}
+        {% with field_ctx=field_ctx, component_ctx=component_ctx, item=item, model_name=current_model_name_for_url, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+            {% include "components/_form_floating_wrapper.html" %}
+        {% endwith %}
+    {% else %}
+        {% if field_ctx.label and component_ctx.component_mode not in ['table_cell', 'list_table_rows_fragment'] %}
+            {% with field_ctx=field_ctx, component_ctx=component_ctx %}
+                {% include "components/_field_label.html" %}
+            {% endwith %}
+        {% endif %}
+        <div class="ms-3 lfield-control-wrapper"
+             {% if field_ctx.is_editable_context and field_ctx.state == 'view' and current_item_id_for_url %}
+                 hx-get="{{
+                         url_for('get_field_fragment',
+                         parent_mode=effective_parent_mode_for_url,
+                         model_name=current_model_name_for_url,
+                         item_id=current_item_id_for_url,
+                         field_name=field_ctx.name) }}?field_state={{ 'edit'
+                         }}"
+                 hx-target="#{{ field_instance_id }}"
+                 hx-swap="outerHTML"
+                 title="Кликните для редактирования: {{ field_ctx.label }}"
+                 style="cursor: pointer;"
+                 class="editable-field-view"
+             {% endif %}>
+            {% with field_ctx=field_ctx, component_ctx=component_ctx, item=item, model_name=current_model_name_for_url, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+                 {% include field_ctx.template_path %}
+            {% endwith %}
+        </div>
+        {% if field_ctx.description and component_ctx.component_mode not in ['table_cell', 'list_table_rows_fragment'] %}
+            {% with field_ctx=field_ctx %}
+                {% include "components/_field_description_standalone.html" %}
+            {% endwith %}
+        {% endif %}
+        {% with field_ctx=field_ctx %}
+            {% include "components/_field_errors.html" %}
+        {% endwith %}
+    {% endif %}
+</div>

@@ -1,0 +1,75 @@
+{# core_sdk/frontend/templates/fields/text_field.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext) #}
+{#           request, user, SDK_STATIC_URL, url_for (для hx-атрибутов инпута, если они там нужны) #}
+
+{% if field_ctx.state == 'view' %}
+    {# --- VIEW STATE --- #}
+    {# Определяем, находимся ли мы в контексте, где нужен form-control-plaintext (обычно это form-floating) #}
+    {% set is_plaintext_context = component_ctx.component_mode in ['view_form'] and
+                                field_ctx.field_type not in ['switch', 'checkbox', 'json', 'list_simple', 'list_relation'] %}
+                                {# Добавил 'edit_form', 'create_form', 'filter_form' сюда не нужно, т.к. для них state будет EDIT #}
+
+    <{{ 'div' if is_plaintext_context else 'span' }}
+        {# ID для view-элемента, если он нужен для каких-то JS-манипуляций или тестов #}
+        {# id="{{ field_ctx.html_id }}-view-value" #}
+        class="{{ 'form-control-plaintext ps-3 pe-3 pt-3 pb-1' if is_plaintext_context else '' }}"
+        {% if is_plaintext_context %}
+            style="min-height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center;"
+        {% endif %}>
+        {# Выводим значение. Для таблиц и простого спана default='-' #}
+        {# Для form-control-plaintext default=' ' для сохранения высоты form-floating #}
+        <span>{{ field_ctx.value | default((' '|safe) if is_plaintext_context else '-', true) }}</span>
+    </{{ 'div' if is_plaintext_context else 'span' }}>
+
+{% elif field_ctx.state == 'edit' %}
+    {# --- EDIT STATE --- #}
+    {% set input_type = field_ctx.extra_attrs.get('input_type', 'text') %}
+    {% if field_ctx.field_type == 'number' %}{% set input_type = 'number' %}
+        {% elif field_ctx.field_type == 'datetime' %}{% set input_type = 'datetime-local' %}
+        {% elif field_ctx.field_type == 'date' %}{% set input_type = 'date' %}
+        {% elif field_ctx.field_type == 'time' %}{% set input_type = 'time' %}
+        {% elif field_ctx.field_type == 'email' %}{% set input_type = 'email' %}
+        {% elif field_ctx.field_type == 'url' %}{% set input_type = 'url' %}
+    {% endif %}
+
+    {% set current_value = field_ctx.value %}
+    {% if input_type == 'datetime-local' and field_ctx.value and hasattr(field_ctx.value, 'strftime') %}
+        {% set current_value = field_ctx.value.strftime('%Y-%m-%dT%H:%M') %}
+    {% elif input_type == 'date' and field_ctx.value and hasattr(field_ctx.value, 'strftime') %}
+        {% set current_value = field_ctx.value.strftime('%Y-%m-%d') %}
+    {% elif input_type == 'time' and field_ctx.value and hasattr(field_ctx.value, 'strftime') %}
+        {% set current_value = field_ctx.value.strftime('%H:%M') %}
+    {% else %}
+        {% set current_value = field_ctx.value | default('', true) %}
+    {% endif %}
+
+    <input type="{{ input_type }}"
+           class="form-control
+                  {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}form-control-sm{% endif %}
+                  {% if field_ctx.errors %}is-invalid{% endif %}"
+           id="{{ field_ctx.html_id }}" {# Этот ID будет использоваться лейблом в form-floating #}
+           name="{{ field_ctx.html_name }}"
+           value="{{ current_value }}"
+           {# placeholder для form-floating не нужен здесь, он в label. Для не-form-floating он может быть полезен. #}
+           {# Если _field_layout_wrapper не использует form-floating, то placeholder будет из field_ctx.label #}
+           placeholder="{{ field_ctx.label if not component_ctx.component_mode in ['view_form', 'edit_form', 'create_form', 'filter_form'] or field_ctx.field_type == 'switch' else '' }}"
+           {% if field_ctx.is_readonly %}readonly disabled{% endif %}
+           {% if field_ctx.is_required %}required{% endif %}
+           aria-describedby="{{ field_ctx.html_id }}_errors" {# Для ошибок, которые рендерятся отдельно #}
+           {# Атрибуты для инлайн-сохранения, если это инлайн-редактирование #}
+           {# field_ctx.is_editable_context здесь должен быть true, так как state == 'edit' #}
+           {% if component_ctx.item_id %} {# Убедимся, что item_id есть для URL #}
+               hx-put="{{ url_for('update_inline_field', parent_mode=component_ctx.component_mode.value, model_name=current_model_name_for_url, item_id=current_item_id_for_url, field_name=field_ctx.name) }}"
+               hx-ext="json-enc"
+               hx-trigger="blur, keyup[key=='Enter']"
+               {# hx-target будет на родительской обертке (_field_layout_wrapper или _inline_input_wrapper) #}
+               {# hx-swap также будет на родительской обертке #}
+               hx-indicator="closest .field-layout-wrapper" {# Индикатор на всю обертку поля #}
+           {% endif %}
+           {# autofocus для инлайн-редактирования #}
+           {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}autofocus{% endif %}
+           {# Добавляем кастомные атрибуты из field_ctx.extra_attrs #}
+           {% for attr, val in field_ctx.extra_attrs.items() %}
+               {{ attr }}="{{ val }}"
+           {% endfor %}>
+{% endif %}

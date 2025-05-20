@@ -1,28 +1,48 @@
 {# core_sdk/frontend/templates/components/view.html #}
-{# Ожидает: ctx, request, user, SDK_STATIC_URL, url_for #}
+{# Ожидает: ctx (RenderContext с component_mode=VIEW_FORM), request, user, SDK_STATIC_URL, url_for #}
 
-{% for field_ctx_loopvar in ctx.fields %}
-    {% with field_ctx=field_ctx_loopvar, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for, ctx=ctx %}
-        {% include field_ctx_loopvar.template_path %} {# Шаблоны *_view.html теперь form-floating #}
+{% for current_field_ctx_from_loop in ctx.fields %}
+    {# current_field_ctx_from_loop.state здесь FieldState.VIEW #}
+    {# current_field_ctx_from_loop.template_path указывает на единый шаблон поля (например, text_field.html) #}
+    {# _field_layout_wrapper сам вызовет field_ctx.template_path #}
+    {% with field_ctx=current_field_ctx_from_loop, component_ctx=ctx, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+        {% include "components/_field_layout_wrapper.html" %}
     {% endwith %}
 {% endfor %}
 
 {# Кнопки для view mode #}
-{% set is_inside_modal_body = request.headers.get("HX-Target") and (".modal-body" in request.headers.get("HX-Target") or ".modal-content" in request.headers.get("HX-Target")) or (ctx.html_id and "modal-view-" in ctx.html_id) %}
+{% set is_inside_modal_body = request.headers.get("HX-Target") and
+                             ( (".modal-body" in request.headers.get("HX-Target")) or
+                               (".modal-content" in request.headers.get("HX-Target"))
+                             ) or
+                             (ctx.html_id and ("modal-view-" in ctx.html_id)) %}
+
 <div class="pt-5 mt-auto {% if not is_inside_modal_body %}border-top{% endif %}">
     <div class="d-flex justify-content-end">
         {% if is_inside_modal_body %}
-            {# Кнопка "Закрыть" будет в _modal_wrapper.html #}
+            <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Закрыть</button>
             {% if ctx.can_edit %}
             <button type="button" class="btn btn-primary"
-                    hx-get="{{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-                    hx-target="closest .modal-body" {# Заменяем содержимое .modal-body #}
-                    hx-swap="innerHTML">
+                    hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) | urlencode }}&modal_title={{ ('Редактирование: ' ~ ctx.model_name) | urlencode }}&modal_size=modal-xl"
+                    hx-target="#modal-placeholder" {# Загружаем новую модалку с формой редактирования #}
+                    hx-swap="innerHTML"
+                    data-bs-dismiss="modal" {# Закрываем текущую модалку просмотра перед загрузкой новой #}
+                    >
                 Редактировать
             </button>
             {% endif %}
         {% else %}
-            {# ... кнопки для полностраничного view ... #}
+            <a href="{{ url_for('get_list_table', model_name=ctx.model_name) if 'get_list_table' in request.app.router.routes_by_name else '#' }}" class="btn btn-light me-3">
+                К списку
+            </a>
+            {% if ctx.can_edit %}
+             <button type="button" class="btn btn-primary"
+                    hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ url_for('get_edit_form', model_name=ctx.model_name, item_id=ctx.item_id) | urlencode }}&modal_title={{ ('Редактирование: ' ~ ctx.model_name) | urlencode }}&modal_size=modal-xl"
+                    hx-target="#modal-placeholder"
+                    hx-swap="innerHTML">
+                Редактировать
+            </button>
+            {% endif %}
         {% endif %}
     </div>
 </div>

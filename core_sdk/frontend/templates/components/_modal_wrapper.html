@@ -1,9 +1,5 @@
 {# core_sdk/frontend/templates/components/_modal_wrapper.html #}
 {# Ожидает: modal_id, modal_title, modal_size, content_url #}
-{# А также ctx (RenderContext), если кнопки футера зависят от режима (view/edit/create) #}
-{# ctx будет доступен, если get_modal_wrapper его передаст, или если этот шаблон #}
-{# используется как базовый для _modal_view_wrapper / _modal_form_wrapper, которые получают ctx #}
-
 <div class="modal fade" tabindex="-1" id="{{ modal_id }}">
     <div class="modal-dialog {{ modal_size | default('modal-xl') }} modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content" id="{{ modal_id }}-content">
@@ -14,39 +10,55 @@
             <div class="modal-body"
                  hx-get="{{ content_url }}"
                  hx-trigger="load"
-                 hx-swap="innerHTML"
-                 >
-                <div class="text-center p-5"> {# Плейсхолдер загрузки #}
+                 hx-swap="innerHTML">
+                <div class="text-center p-5">
                     <span class="spinner-border text-primary" role="status"></span>
                     <p class="mt-2">Загрузка содержимого...</p>
                 </div>
             </div>
             <div class="modal-footer">
-                {# Этот футер теперь может быть почти пустым, если form.html/view.html #}
-                {# сами управляют своими кнопками. #}
-                {# Оставим только универсальную кнопку "Закрыть", если контент не предоставит свою "Отмену". #}
-                {# Но form.html и view.html теперь имеют свои кнопки "Отмена" с data-bs-dismiss="modal". #}
-                {# Поэтому этот футер может быть полностью пустым. #}
-                {% block modal_footer_buttons %}
-                    {# Пусто, так как form.html и view.html теперь содержат свои кнопки #}
-                    {# Если бы они не содержали, здесь была бы кнопка: #}
-                    {# <button type="button" class="btn btn-light" data-bs-dismiss="modal">Закрыть</button> #}
-                {% endblock modal_footer_buttons %}
+                {# Пусто - кнопки ожидаются от content_url #}
             </div>
         </div>
     </div>
 </div>
 <script>
-// ... (JS для показа/скрытия/удаления модалки, как был) ...
 (function() {
     const modalId = '{{ modal_id }}';
     let modalElement = document.getElementById(modalId);
     if (modalElement) {
         const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-        const handleModalHidden = (event) => { /* ... */ };
-        modalElement.addEventListener('hidden.bs.modal', handleModalHidden, { once: true });
-        if (!modalElement.classList.contains('show')) { modal.show(); }
-        else { modal.handleUpdate(); }
+        const handleModalHidden = (event) => {
+            if (event.target === modalElement) { // Убедимся, что это именно наша модалка
+                modalElement.removeEventListener('hidden.bs.modal', handleModalHidden);
+                modalElement.remove(); // Удаляем элемент модалки из DOM
+                // console.log(`Modal ${modalId} removed from DOM after hidden.`);
+            }
+        };
+        modalElement.addEventListener('hidden.bs.modal', handleModalHidden);
+
+        // Показываем модалку, если она еще не показана
+        // Это нужно, если hx-get в _modal_wrapper загружает этот же _modal_wrapper (матрешка)
+        // или если JS создает модалку и сразу хочет ее показать.
+        // Для стандартного случая (get_modal_wrapper -> hx-get content_url) это может быть избыточно,
+        // но безопасно.
+        if (!modalElement.classList.contains('show')) {
+             // console.log(`Modal ${modalId} is not shown, calling show().`);
+             modal.show();
+        } else {
+             // console.log(`Modal ${modalId} is already shown, calling handleUpdate().`);
+             modal.handleUpdate(); // Обновить позиционирование, если контент изменился
+        }
+
+        // Если футер был загружен через hx-get в .modal-body, его нужно переместить
+        const loadedFooter = modalElement.querySelector('.modal-body > .modal-footer.sdk-override-footer');
+        if (loadedFooter) {
+            const mainFooter = modalElement.querySelector('.modal-content > .modal-footer');
+            if (mainFooter) {
+                mainFooter.innerHTML = ''; // Очищаем основной футер
+                mainFooter.appendChild(loadedFooter); // Перемещаем загруженный
+            }
+        }
     }
 })();
 </script>

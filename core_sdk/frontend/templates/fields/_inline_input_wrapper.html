@@ -1,9 +1,0 @@
-{# _inline_input_wrapper.html #}
-<div class="inline-edit-wrapper {% if field_ctx.errors %}border border-danger{% endif %}" {# Визуальная отметка ошибки на обертке #}
-     hx-trigger="keyup[key=='Escape'] from:body"
-     hx-get="{{ url_for('get_table_cell_view', model_name=model_name, item_id=item_id, field_name=field_ctx.name) }}"
-     hx-target="closest td"
-     hx-swap="innerHTML">
-
-    {% include "fields/_input_inline.html" with context %}
-</div>

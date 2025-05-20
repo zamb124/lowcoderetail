@@ -59,7 +59,7 @@
                 {% if user and user.has_permission('groups:view') %} {# Проверка прав #}
                     <li class="pc-item">
                         <a href="#" class="pc-link"
-                           hx-get="{{ url_for('get_list_view', model_name='Group') }}"
+                           hx-get="{{ url_for('get_list_table', model_name='Group') }}"
                            hx-target="#main-content-area"
                            hx-swap="innerHTML"
                            hx-push-url="/groups"> {# Пример URL для списка #}

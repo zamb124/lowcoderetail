@@ -1,0 +1,13 @@
+{# core_sdk/frontend/templates/components/_field_label.html #}
+{# Ожидает: field_ctx (FieldRenderContext) #}
+{#           component_ctx (RenderContext - для определения, нужен ли form-label или только для form-floating) #}
+
+{% set is_form_floating_context = component_ctx.component_mode in ['view_form', 'edit_form', 'create_form', 'filter_form'] and field_ctx.field_type not in ['switch', 'checkbox'] %}
+{# Для switch/checkbox в form-floating label внутри .form-check-label #}
+
+<label for="{{ field_ctx.html_id }}"
+       class="{{ 'form-label' if not is_form_floating_context and field_ctx.state == 'edit' else '' }}
+              {{ 'text-muted' if field_ctx.state == 'view' and is_form_floating_context else 'ms-2' }}">
+    {{ field_ctx.label }}
+    {% if field_ctx.is_required and field_ctx.state == 'edit' %}<span class="text-danger">*</span>{% endif %}
+</label>

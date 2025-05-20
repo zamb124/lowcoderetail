@@ -24,7 +24,7 @@
 
     {# Плейсхолдер для таблицы #}
     <div id="table-placeholder-{{ model_name | lower }}" class="mt-4"
-         hx-get="{{ url_for('get_list_view', model_name=model_name) }}" {# Начальная загрузка без фильтров #}
+         hx-get="{{ url_for('get_list_table', model_name=model_name) }}" {# Начальная загрузка без фильтров #}
          hx-trigger="load" {# Загрузка при отображении страницы #}
          {# Дополнительный триггер для обновления таблицы при изменении фильтра будет на полях фильтра #}
          hx-swap="innerHTML">

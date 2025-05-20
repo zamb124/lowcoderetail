@@ -1,0 +1,66 @@
+{# core_sdk/frontend/templates/fields/select_field.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext) #}
+
+{% if field_ctx.state == 'view' %}
+    {# --- VIEW STATE --- #}
+    {% set is_plaintext_context = component_ctx.component_mode == 'view_form' %}
+    {% set display_value = field_ctx.value %} {# По умолчанию показываем само значение #}
+    {% if field_ctx.options and field_ctx.value is not none %}
+        {# Пытаемся найти лейбл для значения в опциях #}
+        {% for opt_val, opt_label in field_ctx.options %}
+            {% if opt_val | string == field_ctx.value | string %}
+                {% set display_value = opt_label %}
+                {% break %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+
+    <{{ 'div' if is_plaintext_context else 'span' }}
+        class="{{ 'form-control-plaintext ps-3 pe-3 pt-3 pb-1' if is_plaintext_context else '' }}"
+        {% if is_plaintext_context %}
+            style="min-height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center;"
+        {% endif %}>
+        <span>{{ display_value | default((' '|safe) if is_plaintext_context else '-', true) }}</span>
+    </{{ 'div' if is_plaintext_context else 'span' }}>
+
+{% elif field_ctx.state == 'edit' %}
+    {# --- EDIT STATE --- #}
+    <select class="form-select
+                   {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}form-select-sm{% endif %}
+                   {% if field_ctx.errors %}is-invalid{% endif %}"
+            id="{{ field_ctx.html_id }}"
+            name="{{ field_ctx.html_name }}"
+            {# data-control="select2-simple" - можно убрать, если не используется глобально, или оставить #}
+            data-placeholder="{{ field_ctx.extra_attrs.get('placeholder', field_ctx.label ~ '...') }}"
+            data-allow-clear="{{ 'true' if field_ctx.extra_attrs.get('allow_clear', True) and not field_ctx.is_required else 'false' }}"
+            {% if field_ctx.is_readonly %}disabled{% endif %}
+            {% if field_ctx.is_required %}required{% endif %}
+            aria-label="{{ field_ctx.label }}"
+            aria-describedby="{{ field_ctx.html_id }}_errors"
+            {# Атрибуты для инлайн-сохранения, если это инлайн-редактирование #}
+            {% if field_ctx.is_editable_context and component_ctx.item_id %}
+                hx-put="{{ url_for('update_inline_field', model_name=component_ctx.model_name, item_id=component_ctx.item_id, field_name=field_ctx.name) }}"
+                hx-ext="json-enc"
+                hx-trigger="change" {# Для select лучше 'change' чем 'blur' #}
+                hx-target="closest .field-layout-wrapper"
+                hx-swap="outerHTML"
+                hx-indicator="closest .field-layout-wrapper"
+            {% endif %}
+            {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}autofocus{% endif %}
+            {% for attr, val in field_ctx.extra_attrs.items() if attr.startswith('hx-') or attr.startswith('data-') and attr not in ['data-control', 'data-placeholder', 'data-allow-clear'] %}
+                {{ attr }}="{{ val }}"
+            {% endfor %}>
+
+        {% if not field_ctx.is_required or field_ctx.extra_attrs.get('show_empty_option', True) %}
+            <option value="">{{ field_ctx.extra_attrs.get('placeholder', field_ctx.label ~ '...') }}</option>
+        {% endif %}
+
+        {% if field_ctx.options %}
+            {% for opt_val, opt_label_text in field_ctx.options %}
+                <option value="{{ opt_val }}" {% if opt_val | string == field_ctx.value | string %}selected{% endif %}>
+                    {{ opt_label_text }}
+                </option>
+            {% endfor %}
+        {% endif %}
+    </select>
+{% endif %}

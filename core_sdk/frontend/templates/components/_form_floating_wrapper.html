@@ -1,0 +1,23 @@
+{# core_sdk/frontend/templates/components/_form_floating_wrapper.html #}
+{# Ожидает: field_ctx, component_ctx, item, model_name, ... #}
+
+{% set field_instance_id = field_ctx.html_id ~ "-instance" %}
+{% set current_item_id_for_url = item.id if item and item.id else component_ctx.item_id %}
+{% set current_model_name_for_url = model_name if model_name else component_ctx.model_name %}
+{% set effective_parent_mode_for_url = click_to_edit_parent_mode | default(component_ctx.component_mode.value) %}
+<div class="form-floating field-control-wrapper"
+     {% if field_ctx.is_editable_context and field_ctx.state == 'view' and current_item_id_for_url %}
+         hx-get="{{ url_for('get_field_fragment', parent_mode=effective_parent_mode_for_url, model_name=current_model_name_for_url, item_id=current_item_id_for_url, field_name=field_ctx.name) }}?field_state={{ 'edit' }}"
+         hx-target="#{{ field_instance_id }}"
+         hx-swap="outerHTML"
+         title="Кликните для редактирования: {{ field_ctx.label }}"
+         style="cursor: pointer;"
+         class="editable-field-view"
+     {% endif %}>
+    {% with field_ctx=field_ctx, component_ctx=component_ctx, item=item, model_name=current_model_name_for_url, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+        {% include field_ctx.template_path %}
+    {% endwith %}
+    {% include "components/_field_label.html" %}
+    {% include "components/_field_description_floating.html" %}
+</div>
+{% include "components/_field_errors.html" %}

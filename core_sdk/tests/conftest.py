@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import (
 
 from sqlmodel import SQLModel, Field as SQLModelField
 from pydantic import BaseModel as PydanticBaseModel, ConfigDict, HttpUrl
+from starlette.responses import HTMLResponse
 
 from core_sdk.db import session as sdk_db_session_module
 from core_sdk.db.session import (
@@ -374,10 +375,13 @@ def mock_app_http_client_lifespan_cm():
 # Фикстуры для test_frontend_base_router
 @pytest.fixture
 def mock_templates_response_method(monkeypatch: pytest.MonkeyPatch) -> mock.Mock:
-    """Мокирует метод TemplateResponse у Jinja2Templates."""
     from starlette.templating import Jinja2Templates
-    mock_method = mock.Mock(return_value="<div>Mocked TemplateResponse HTML</div>")
-    # Патчим метод на уровне класса, чтобы все экземпляры использовали мок
+    # Мок должен возвращать объект, похожий на Response, чтобы TestClient мог прочитать status_code
+    def mock_template_response_func(name, context, status_code=200, headers=None, media_type=None, background=None):
+        # Имитируем поведение HTMLResponse для TestClient
+        return HTMLResponse(content="<div>Mocked TemplateResponse HTML</div>", status_code=status_code, headers=headers, media_type=media_type, background=background)
+
+    mock_method = mock.Mock(side_effect=mock_template_response_func) # Используем side_effect
     monkeypatch.setattr(Jinja2Templates, "TemplateResponse", mock_method, raising=False)
     return mock_method
 

@@ -1,0 +1,56 @@
+{# core_sdk/frontend/templates/fields/json_field.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext) #}
+
+{% if field_ctx.state == 'view' %}
+    {# --- VIEW STATE --- #}
+    {% set is_plaintext_context = component_ctx.component_mode == 'view_form' %}
+    <div class="field-json-view">
+        {% if is_plaintext_context %}
+        <label class="form-label fs-6 fw-semibold text-muted d-block">
+            {{ field_ctx.label }}
+            {% if field_ctx.description %}
+                <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top"
+                      data-bs-container="{% if component_ctx and component_ctx.extra and component_ctx.extra.modal_container_id %}{{ '#' ~ component_ctx.extra.modal_container_id }}{% else %}body{% endif %}"
+                      title="{{ field_ctx.description | escape }}">
+                    <i class="ti ti-info-circle text-muted" style="font-size: 0.9em;"></i>
+                </span>
+            {% endif %}
+        </label>
+        {% endif %}
+        <pre class="form-control-plaintext p-2 border rounded bg-light"
+             style="max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;"
+             title="{{ field_ctx.label if not is_plaintext_context else '' }}"><code>{{- field_ctx.value | tojson(indent=2) if field_ctx.value is mapping or field_ctx.value is list else (field_ctx.value | string if field_ctx.value is not none else (' '|safe if is_plaintext_context else '-')) -}}</code></pre>
+    </div>
+
+{% elif field_ctx.state == 'edit' %}
+    {# --- EDIT STATE --- #}
+    <textarea class="form-control
+                     {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}form-control-sm{% endif %}
+                     {% if field_ctx.errors %}is-invalid{% endif %}"
+              id="{{ field_ctx.html_id }}"
+              name="{{ field_ctx.html_name }}"
+              rows="{{ field_ctx.extra_attrs.get('rows', 5) }}"
+              placeholder="Введите корректный JSON"
+              {% if field_ctx.is_readonly %}readonly disabled{% endif %}
+              {% if field_ctx.is_required %}required{% endif %}
+              aria-describedby="{{ field_ctx.html_id }}_errors"
+              {# Атрибуты для инлайн-сохранения #}
+              {% if field_ctx.is_editable_context and component_ctx.item_id %}
+                  hx-put="{{ url_for('update_inline_field', model_name=component_ctx.model_name, item_id=component_ctx.item_id, field_name=field_ctx.name) }}"
+                  hx-ext="json-enc"
+                  hx-trigger="blur"
+                  hx-target="closest .field-layout-wrapper"
+                  hx-swap="outerHTML"
+                  hx-indicator="closest .field-layout-wrapper"
+                  {# Важно: бэкенд должен ожидать строку и парсить ее как JSON. #}
+                  {# Если hx-ext="json-enc", то JS должен убедиться, что отправляется валидный JSON объект, а не строка. #}
+                  {# Для textarea + json-enc, HTMX отправит {"field_name": "строка из textarea"}. #}
+                  {# Бэкенд должен будет json.loads() эту строку. #}
+              {% endif %}
+              {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}autofocus{% endif %}
+              {% for attr, val in field_ctx.extra_attrs.items() %}
+                  {{ attr }}="{{ val }}"
+              {% endfor %}
+              >{{ field_ctx.value | tojson(indent=2) if field_ctx.value is mapping or field_ctx.value is list else (field_ctx.value | default('', true)) }}</textarea>
+    <small class="form-text text-muted">Введите корректный JSON. Ошибки парсинга будут показаны при сохранении.</small>
+{% endif %}

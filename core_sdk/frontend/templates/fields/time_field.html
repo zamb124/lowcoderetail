@@ -1,0 +1,59 @@
+{# core_sdk/frontend/templates/fields/time_field.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext) #}
+
+{% if field_ctx.state == 'view' %}
+    {# --- VIEW STATE --- #}
+    {% set is_plaintext_context = component_ctx.component_mode == 'view_form' %}
+    {% set formatted_value = ' '|safe %}
+    {% if field_ctx.value %}
+        {% if hasattr(field_ctx.value, 'strftime') %}
+            {% set formatted_value = field_ctx.value.strftime('%H:%M') %}
+        {% elif field_ctx.value is string %}
+            {% set formatted_value = field_ctx.value %}
+        {% endif %}
+    {% endif %}
+    {% if not formatted_value.strip() and not is_plaintext_context %}{% set formatted_value = '-' %}{% endif %}
+
+    <{{ 'div' if is_plaintext_context else 'span' }}
+        class="{{ 'form-control-plaintext ps-3 pe-3 pt-3 pb-1' if is_plaintext_context else '' }}"
+        {% if is_plaintext_context %}
+            style="min-height: calc(1.5em + 0.75rem + 2px); display: flex; align-items: center;"
+        {% endif %}>
+        <span>{{ formatted_value }}</span>
+    </{{ 'div' if is_plaintext_context else 'span' }}>
+
+{% elif field_ctx.state == 'edit' %}
+    {# --- EDIT STATE --- #}
+    {% set current_value_for_input = '' %}
+    {% if field_ctx.value %}
+        {% if hasattr(field_ctx.value, 'strftime') %}
+            {% set current_value_for_input = field_ctx.value.strftime('%H:%M') %}
+        {% elif field_ctx.value is string and ":" in field_ctx.value %}
+            {% set current_value_for_input = field_ctx.value %}
+        {% endif %}
+    {% endif %}
+
+    <input type="time"
+           class="form-control
+                  {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}form-control-sm{% endif %}
+                  {% if field_ctx.errors %}is-invalid{% endif %}"
+           id="{{ field_ctx.html_id }}"
+           name="{{ field_ctx.html_name }}"
+           value="{{ current_value_for_input }}"
+           placeholder="{{ field_ctx.label if not component_ctx.component_mode in ['view_form', 'edit_form', 'create_form', 'filter_form'] else '' }}"
+           {% if field_ctx.is_readonly %}readonly disabled{% endif %}
+           {% if field_ctx.is_required %}required{% endif %}
+           aria-describedby="{{ field_ctx.html_id }}_errors"
+           {% if field_ctx.is_editable_context and component_ctx.item_id %}
+               hx-put="{{ url_for('update_inline_field', model_name=component_ctx.model_name, item_id=component_ctx.item_id, field_name=field_ctx.name) }}"
+               hx-ext="json-enc"
+               hx-trigger="blur, change"
+               hx-target="closest .field-layout-wrapper"
+               hx-swap="outerHTML"
+               hx-indicator="closest .field-layout-wrapper"
+           {% endif %}
+           {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}autofocus{% endif %}
+           {% for attr, val in field_ctx.extra_attrs.items() %}
+               {{ attr }}="{{ val }}"
+           {% endfor %}>
+{% endif %}

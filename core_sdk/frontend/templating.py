@@ -44,6 +44,7 @@ def setup_jinja_env(template_dirs: List[str]) -> Environment:
 
     env.filters["get_field_type"] = get_field_type
     env.filters["tovals"] = json.dumps
+    env.filters["hasattr"] = hasattr
     # --------------------------------------------------------------------
 
     logger.info(

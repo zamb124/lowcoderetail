@@ -1,0 +1,104 @@
+{# core_sdk/frontend/templates/fields/list_relation_select_field.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext), url_for #}
+
+{% if field_ctx.state == 'view' %}
+    {# --- VIEW STATE --- #}
+    {% set is_plaintext_context = component_ctx.component_mode == 'view_form' %}
+    {# В режиме VIEW для list_relation мы показываем список тегов/ссылок #}
+    {# Обертка form-floating здесь не очень подходит, используем обычный div с label сверху #}
+    <div class="field-list-relation-view">
+        {% if is_plaintext_context %} {# Показываем label только если это не ячейка таблицы #}
+        <label class="form-label fs-6 fw-semibold text-muted d-block">
+            {{ field_ctx.label }}
+            {% if field_ctx.description %}
+                <span class="ms-1" data-bs-toggle="tooltip" data-bs-placement="top"
+                      data-bs-container="{% if component_ctx and component_ctx.extra and component_ctx.extra.modal_container_id %}{{ '#' ~ component_ctx.extra.modal_container_id }}{% else %}body{% endif %}"
+                      title="{{ field_ctx.description | escape }}">
+                    <i class="ti ti-info-circle text-muted" style="font-size: 0.9em;"></i>
+                </span>
+            {% endif %}
+        </label>
+        {% endif %}
+        <div class="{% if is_plaintext_context %}ps-1 mt-1{% endif %}">
+            {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string and field_ctx.value | length > 0 %}
+                {% set related_model_name = field_ctx.related_model_name %}
+                <div class="d-flex flex-wrap gap-1">
+                    {% for item_id_val_loopvar in field_ctx.value %}
+                        {% set item_id_val = item_id_val_loopvar %}
+                        {% if item_id_val and related_model_name %}
+                            {% set view_content_url = url_for('get_view_form', model_name=related_model_name, item_id=item_id_val) %}
+                            <a href="#" class="badge badge-sm badge-light-primary needs-title-resolution"
+                               data-model-name="{{ related_model_name }}"
+                               data-item-id="{{ item_id_val }}"
+                               hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ related_model_name) | urlencode }}&modal_size=modal-xl"
+                               hx-target="#modal-placeholder"
+                               hx-swap="innerHTML"
+                               title="Просмотр {{ related_model_name }} {{ item_id_val }}">
+                                ID: {{ item_id_val | string | truncate(8, True, '...') }}
+                            </a>
+                        {% elif item_id_val %}
+                             <span class="badge badge-sm badge-light-secondary" title="ID: {{ item_id_val }}">
+                                {{ item_id_val | string | truncate(8, True, '...') }}
+                             </span>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <span class="text-muted fst-italic">{{ '-' if not is_plaintext_context else 'Нет выбранных элементов' }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+{% elif field_ctx.state == 'edit' %}
+    {# --- EDIT STATE --- #}
+    <select multiple
+            class="form-select
+                   {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}form-select-sm{% endif %}
+                   {% if field_ctx.errors %}is-invalid{% endif %}"
+            data-control="choicesjs"
+            data-placeholder="{{ field_ctx.extra_attrs.get('placeholder', 'Выберите ' ~ field_ctx.label ~ '...') }}"
+            data-allow-clear="false"
+            data-load-options-url="{{ field_ctx.extra_attrs.get('load_options_url', url_for('get_select_options', model_name=field_ctx.related_model_name)) }}"
+            data-search-enabled="{{ field_ctx.extra_attrs.get('search_enabled', 'true') }}"
+            data-remove-item-button="true"
+            id="{{ field_ctx.html_id }}"
+            name="{{ field_ctx.html_name }}"
+            {% if field_ctx.is_readonly %}disabled{% endif %}
+            {% if field_ctx.is_required %}required{% endif %}
+            aria-label="{{ field_ctx.label }}"
+            aria-describedby="{{ field_ctx.html_id }}_errors"
+            {# Атрибуты для инлайн-сохранения #}
+            {% if field_ctx.is_editable_context and component_ctx.item_id %}
+                hx-put="{{ url_for('update_inline_field', model_name=component_ctx.model_name, item_id=component_ctx.item_id, field_name=field_ctx.name) }}"
+                hx-ext="json-enc"
+                hx-trigger="change"
+                hx-target="closest .field-layout-wrapper"
+                hx-swap="outerHTML"
+                hx-indicator="closest .field-layout-wrapper"
+            {% endif %}
+            {% if component_ctx.component_mode == 'table_cell' and field_ctx.is_editable_context %}autofocus{% endif %}
+            {% for attr, val in field_ctx.extra_attrs.items() if attr.startswith('hx-') or attr.startswith('data-') and attr not in ['data-control', 'data-placeholder', 'data-allow-clear', 'data-load-options-url', 'data-search-enabled', 'data-remove-item-button'] %}
+                {{ attr }}="{{ val }}"
+            {% endfor %}>
+
+        {% if field_ctx.value and field_ctx.value is iterable and field_ctx.value is not string %}
+            {% for current_id_val_loopvar in field_ctx.value %}
+                {% set current_id_str = current_id_val_loopvar | string %}
+                {% set found_label = null %}
+                {% if field_ctx.options %}
+                    {% for opt_val, opt_label in field_ctx.options %}
+                        {% if opt_val | string == current_id_str %}
+                            {% set found_label = opt_label %}
+                            <option value="{{ opt_val }}" selected>{{ opt_label }}</option>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+                {% if not found_label %}
+                    <option value="{{ current_id_str }}" selected>
+                        ID: {{ current_id_str | truncate(12, True, '...') }}
+                    </option>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+    </select>
+{% endif %}

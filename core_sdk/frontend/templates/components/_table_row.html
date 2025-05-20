@@ -1,54 +1,66 @@
 {# core_sdk/frontend/templates/components/_table_row.html #}
-{# Ожидает: item, model_name, fields (прототипы), ctx, row_hx_attrs (словарь), request, user, url_for #}
-<tr ui_key="{{ model_name }}--{{ item.id }}" data-lsn="{{ item.lsn }}"
+{# Ожидает: item_read_schema (Pydantic ReadSchema), model_name, fields_protos (список FieldRenderContext для колонок), #}
+{# ctx (полный RenderContext), row_hx_attrs, request, user, url_for, SDK_STATIC_URL #}
+<tr ui_key="{{ model_name }}--{{ item_read_schema.id }}" data-lsn="{{ item_read_schema.lsn }}" class="align-middle"
 {% for attr, val in row_hx_attrs.items() %}
     {{ attr }}='{{ val|safe }}'
 {% endfor %}
 >
-{% for field_prototype_ctx in fields %}
-    {% if field_prototype_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_prototype_ctx.extra.get('table_hidden') %}
-        {% set cell_value = item[field_prototype_ctx.name] %}
-        {% set cell_specific_field_ctx = field_prototype_ctx.model_copy(update={'value': cell_value }) %}
-        {% with field_ctx=cell_specific_field_ctx, item=item, model_name=model_name, request=request, user=user, url_for=url_for %}
+{% for field_prototype_ctx in fields_protos %}
+    {% if field_prototype_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_prototype_ctx.extra_attrs.get('table_hidden') %}
+        {# Получаем значение из item_read_schema (Pydantic) #}
+        {% set cell_value = item_read_schema[field_prototype_ctx.name] if field_prototype_ctx.name in item_read_schema.__fields_set__ else getattr(item_read_schema, field_prototype_ctx.name, None) %}
+
+        {# Создаем FieldRenderContext для этой ячейки на основе прототипа и текущего значения #}
+        {# Состояние поля для ячейки всегда VIEW, если это не инлайн-редактирование #}
+        {% set cell_specific_field_ctx = field_prototype_ctx.model_copy(update={
+            'value': cell_value,
+            'state': 'view'
+        }) %}
+        {% with
+            field_ctx=cell_specific_field_ctx,
+            item=item_read_schema,
+            model_name=model_name,
+            request=request, user=user, url_for=url_for, SDK_STATIC_URL=SDK_STATIC_URL,
+            ctx=ctx
+        %}
             {% include "components/_table_cell.html" %}
         {% endwith %}
     {% endif %}
 {% endfor %}
 <td class="text-end">
-    {# Кнопка Просмотр #}
-    {% set view_content_url = url_for('get_view', model_name=model_name, item_id=item.id) %}
-    <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+    {% set view_content_url = url_for('get_view_form', model_name=model_name, item_id=item_read_schema.id) %}
+    <a href="#" class="btn btn-icon btn-active-light-primary btn-sm me-1"
        title="Просмотр {{ model_name }}"
        hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ view_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-xl"
-       hx-target="#modal-placeholder" {# Или #modal-placeholder-{{ loop.index0 }} для матрешки #}
+       hx-target="#modal-placeholder"
        hx-swap="innerHTML"
        hx-indicator="closest tr">
-        <i class="ti ti-eye f-20"></i>
+        <i class="ti ti-eye fs-4"></i>
     </a>
 
-    {# Кнопка Редактировать #}
     {% if ctx.can_edit %}
-        {% set edit_content_url = url_for('get_edit_form', model_name=model_name, item_id=item.id) %}
-        <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+        {% set edit_content_url = url_for('get_edit_form', model_name=model_name, item_id=item_read_schema.id) %}
+        <a href="#" class="btn btn-icon btn-active-light-primary btn-sm me-1"
            title="Редактировать {{ model_name }}"
-           hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ edit_content_url | urlencode }}&modal_title={{ ('Просмотр: ' ~ model_name) | urlencode }}&modal_size=modal-xl"
+           hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ edit_content_url | urlencode }}&modal_title={{ ('Редактирование: ' ~ model_name) | urlencode }}&modal_size=modal-xl"
            hx-target="#modal-placeholder"
            hx-swap="innerHTML"
            hx-indicator="closest tr">
-            <i class="ti ti-edit f-20"></i>
+            <i class="ti ti-edit fs-4"></i>
         </a>
     {% endif %}
 
-    {# Кнопка Удалить (остается как есть, загружает _confirm_delete_modal.html) #}
-        {% set delete_content_url = url_for('get_delete_view', model_name=model_name, item_id=item.id) %}
-        <a href="#" class="avtar avtar-xs mx-1 btn-link-secondary"
+    {% if ctx.can_delete %}
+        {% set delete_content_url = url_for('get_delete_confirm', model_name=model_name, item_id=item_read_schema.id) %}
+        <a href="#" class="btn btn-icon btn-active-light-danger btn-sm"
            title="Удалить {{ model_name }}"
            hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ delete_content_url | urlencode }}&modal_title={{ ('Удаление: ' ~ model_name) | urlencode }}&modal_size=modal-lg"
            hx-target="#modal-placeholder"
            hx-swap="innerHTML"
            hx-indicator="closest tr">
-            <i class="ti ti-trash f-20"></i>
+            <i class="ti ti-trash fs-4"></i>
         </a>
-
+    {% endif %}
 </td>
 </tr>

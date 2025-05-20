@@ -1,33 +1,35 @@
 {# core_sdk/frontend/templates/components/_table_rows_fragment.html #}
-{# Ожидает в контексте: items, ctx (RenderContext), request, user, url_for, SDK_STATIC_URL #}
-{# (ViewRenderer.prepare_response_data для LIST_ROWS добавляет items и ctx в верхний уровень контекста) #}
+{# Ожидает в контексте: items (список Pydantic ReadSchema), fields_protos (список FieldRenderContext для колонок), #}
+{# model_name, ctx (полный RenderContext), request, user, url_for, SDK_STATIC_URL #}
 
 {% if items %}
-    {% for current_item_loopvar in items %} {# Используем current_item_loopvar во избежание конфликта с item из внешнего with, если он есть #}
+    {% for current_item_loopvar in items %} {# current_item_loopvar это Pydantic ReadSchema объект #}
         {% set row_hx_attrs = {} %}
         {% if loop.last and ctx.pagination and ctx.pagination.next_cursor %}
-            {% set base_next_url = url_for('get_list_rows', model_name=ctx.model_name) %}
+            {% set base_next_url = url_for('get_list_table_rows', model_name=ctx.model_name) %}
+            {# hx-vals теперь должен включать параметры из формы фильтра, если они есть #}
+            {# Это можно сделать через JS или передав их в ctx.pagination #}
+            {# Проще всего, если hx-get на строке будет также включать hx-include на форму фильтра #}
             {% set hx_vals_dict = {
                 "cursor": ctx.pagination.next_cursor,
                 "limit": ctx.pagination.limit,
                 "direction": ctx.pagination.direction
             } %}
-            {% set filter_form_id = ctx.filter_form_id %} {# Берем из ctx #}
             {% set row_hx_attrs = {
                 "hx-get": base_next_url,
-                "hx-include": filter,
-                "hx-vals": hx_vals_dict|tojson,
+                "hx-include": "#" ~ ctx.filter_form_id,
+                "hx-vals": hx_vals_dict | tojson,
                 "hx-trigger": "revealed",
-                "hx-swap": "beforeend",
+                "hx-swap": "afterend",
                 "hx-indicator": "#table-loading-indicator-" ~ ctx.model_name
             } %}
         {% endif %}
 
         {# Передаем все необходимые переменные в _table_row.html #}
         {% with
-            item=current_item_loopvar,
-            model_name=ctx.model_name,
-            fields=ctx.fields,
+            item_read_schema=current_item_loopvar,
+            model_name=model_name,
+            fields_protos=fields_protos,
             request=request,
             user=user,
             url_for=url_for,
@@ -38,4 +40,11 @@
             {% include "components/_table_row.html" %}
         {% endwith %}
     {% endfor %}
+{% elif not ctx.pagination or not ctx.pagination.next_cursor %} {# Показываем "Нет данных", только если это не результат пустого revealed запроса #}
+    <tr>
+        {% set colspan_count = fields_protos | rejectattr('name', 'in', ['id', 'lsn', 'vars', 'hashed_password']) | rejectattr('extra_attrs.table_hidden') | list | length + 1 %}
+        <td colspan="{{ colspan_count }}" class="text-center text-muted fs-6 py-5">
+            Нет данных для отображения.
+        </td>
+    </tr>
 {% endif %}

@@ -1,26 +1,23 @@
 {# core_sdk/frontend/templates/components/_filter_form.html #}
-{# Ожидает: ctx (RenderContext), request, user, SDK_STATIC_URL, url_for #}
+{# Ожидает: ctx (RenderContext с component_mode=FILTER_FORM), request, user, SDK_STATIC_URL, url_for #}
 
-<form id="{{ ctx.filter_form_id }}" class="mb-3 p-3 border rounded bg-light datatable-filter-form"
-      >
+<form id="{{ ctx.filter_form_id }}" class="mb-3 p-3 border rounded bg-light datatable-filter-form">
     <h5 class="mb-3">Фильтры для: {{ ctx.model_name }}</h5>
     <div class="row g-2 align-items-end">
-        {% for field_ctx_filter_loopvar in ctx.fields %}
+        {% for current_field_ctx_from_loop in ctx.fields %}
+            {# current_field_ctx_from_loop.state здесь FieldState.EDIT #}
             <div class="col-md-4 col-lg-3">
-                {# Убираем hx- атрибуты с полей, так как таблица будет слушать форму #}
-                {% set current_field_ctx_for_render = field_ctx_filter_loopvar %}
-                {% with field_ctx=current_field_ctx_for_render, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
-                    {% include field_ctx_filter_loopvar.template_path %}
+                {% with field_ctx=current_field_ctx_from_loop, component_ctx=ctx, request=request, user=user, SDK_STATIC_URL=SDK_STATIC_URL, url_for=url_for %}
+                    {% include "components/_field_layout_wrapper.html" %}
                 {% endwith %}
             </div>
         {% endfor %}
         <div class="col-md-auto align-self-end mb-3">
-             <a href="#" class="btn btn-sm btn-outline-secondary"
+             <button type="button" class="btn btn-sm btn-outline-secondary"
                 title="Сбросить фильтры"
-                {# Самый простой способ - JS для очистки формы и затем триггер события #}
-                onclick="document.getElementById('{{ ctx.filter_form_id }}').reset(); htmx.trigger(htmx.find('{{ ctx.table_target_id }}'), 'refreshData'); return false;">
+                onclick="document.getElementById('{{ ctx.filter_form_id }}').reset(); htmx.trigger(htmx.find('#{{ ctx.filter_form_id }}'), 'change'); return false;">
                  <i class="ti ti-reload"></i> Сбросить
-             </a>
+             </button>
         </div>
     </div>
 </form>

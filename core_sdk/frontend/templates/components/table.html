@@ -1,22 +1,18 @@
 {# core_sdk/frontend/templates/components/table.html #}
-{# Ожидает: ctx (RenderContext), request, user, url_for #}
+{# Ожидает: ctx (RenderContext с component_mode=LIST_TABLE), request, user, url_for, SDK_STATIC_URL #}
 <div class="card shadow-sm"
-     id="{{ ctx.html_id }}"
-     list-model="{{ ctx.model_name }}"
-     hx-trigger="change from:#filter--{{ ctx.model_name }} delay:500ms, update delay:500ms"
-     hx-get="{{ url_for('get_list_rows', model_name=ctx.model_name) }}"
-     hx-target="#tbody-table--{{ ctx.model_name }}"
-     hx-include="#filter--{{ ctx.model_name }}"
+     id="{{ ctx.html_id }}" {# Уникальный ID для всего компонента таблицы #}
+     list-model="{{ ctx.model_name }}" {# Атрибут для WebSocket и других JS обработчиков #}
      >
     <div class="card-header">
         <h3 class="card-title">{{ ctx.title }}</h3>
         <div class="card-toolbar">
             {% if ctx.can_create %}
-                <button type="button" class="btn btn-primary"
-                        hx-get="{{ url_for('get_create_form', model_name=ctx.model_name) }}"
+                <button type="button" class="btn btn-sm btn-primary"
+                        hx-get="{{ url_for('get_modal_wrapper') }}?content_url={{ url_for('get_create_form', model_name=ctx.model_name) | urlencode }}&modal_title={{ ('Создание: ' ~ ctx.model_name) | urlencode }}&modal_size=modal-xl"
                         hx-target="#modal-placeholder"
                         hx-swap="innerHTML">
-                    <i class="ti ti-plus me-1"></i> Создать {{ ctx.model_name }}
+                    <i class="ti ti-plus me-1"></i> Создать
                 </button>
             {% endif %}
         </div>
@@ -26,49 +22,44 @@
             <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
                 <thead>
                 <tr class="fw-bold text-muted">
-                    {% for field_ctx_proto in ctx.fields %} {# ctx.fields содержит прототипы колонок #}
-                        {% if field_ctx_proto.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_ctx_proto.extra.get('table_hidden') %}
-                            <th class="min-w-150px">{{ field_ctx_proto.label }}
-                                {% if field_ctx_proto.description %}
-                                    <span>
-                                    <i class="ti ti-info-circle ms-1 text-muted align-middle"
-                                       style="cursor: help; font-size: 0.9em; vertical-align: middle;"
-                                       data-bs-toggle="tooltip" data-bs-placement="top"
-                                       title="{{ field_ctx_proto.description | escape }}"></i></span>
+                    {% for field_prototype_ctx in fields_protos %} {# Используем fields_protos  #}
+                        {% if field_prototype_ctx.name not in ['id', 'lsn', 'vars', 'hashed_password'] and not field_prototype_ctx.extra_attrs.get('table_hidden') %}
+                            <th class="min-w-150px">{{ field_prototype_ctx.label }}
+                                {% if field_prototype_ctx.description %}
+                                    <span class="ms-1"
+                                          data-bs-toggle="tooltip" data-bs-placement="top"
+                                          title="{{ field_prototype_ctx.description | escape }}">
+                                        <i class="ti ti-info-circle text-muted" style="font-size: 0.9em;"></i>
+                                    </span>
                                 {% endif %}
                             </th>
-
                         {% endif %}
                     {% endfor %}
                     <th class="min-w-100px text-end">Действия</th>
                 </tr>
                 </thead>
-                <tbody id="tbody-table--{{ ctx.model_name }}">
-                {% if ctx.items %}
-                    {% with
-                        items=ctx.items,
-                        model_name=ctx.model_name,
-                        ctx=ctx,
-                        request=request,
-                        user=user,
-                        table_key=ctx.table_key %}
-                        {% include "components/_table_rows_fragment.html" %}
-                    {% endwith %}
-                {% else %}
+                {# --- ИЗМЕНЕНИЕ: tbody теперь загружается асинхронно --- #}
+                <tbody id="tbody-table--{{ ctx.model_name }}"
+                       hx-get="{{ url_for('get_list_table_rows', model_name=ctx.model_name) }}"
+                       hx-trigger="load, change from:#{{ ctx.filter_form_id }} delay:500ms, itemCreated_{{ ctx.model_name }} from:body delay:200ms, itemUpdated_{{ ctx.model_name }} from:body delay:200ms, itemDeleted_{{ ctx.model_name }} from:body delay:200ms, refreshData from:body"
+                       hx-include="#{{ ctx.filter_form_id }}" {# Включаем фильтры при каждом запросе #}
+                       hx-swap="innerHTML" {# Заменяем содержимое tbody #}
+                       hx-indicator="#table-loading-indicator-{{ ctx.model_name }}"
+                       >
+                    {# Плейсхолдер загрузки для tbody #}
                     <tr>
-                        {% set colspan_count = ctx.fields | rejectattr('name', 'in', ['id', 'lsn', 'vars', 'hashed_password']) | rejectattr('extra.table_hidden') | list | length + 1 %}
-                        <td colspan="{{ colspan_count }}" class="text-center text-muted fs-4 py-10">Нет данных для
-                            отображения
+                        {% set colspan_count = ctx.fields_protos | rejectattr('name', 'in', ['id', 'lsn', 'vars', 'hashed_password']) | rejectattr('extra_attrs.table_hidden') | list | length + 1 %}
+                        <td colspan="{{ colspan_count }}" class="text-center text-muted fs-6 py-10">
+                            <span class="spinner-border spinner-border-sm"></span> Загрузка данных...
                         </td>
                     </tr>
-                {% endif %}
                 </tbody>
+                {# ---------------------------------------------------- #}
             </table>
         </div>
-        <div id="table-loading-indicator-{{ ctx.model_name }}" class="htmx-indicator text-center py-5"
-             style="display: none;">
+        {# Индикатор загрузки для таблицы (когда обновляются строки в tbody) #}
+        <div id="table-loading-indicator-{{ ctx.model_name }}" class="htmx-indicator text-center py-3" style="display: none;">
             <span class="spinner-border spinner-border-sm align-middle ms-2"></span> Загрузка...
         </div>
     </div>
 </div>
-<div id="modal-placeholder"></div>

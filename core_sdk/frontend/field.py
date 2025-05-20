@@ -3,12 +3,12 @@ import uuid
 import inspect
 from typing import Any, Optional, Dict, TYPE_CHECKING, List, Tuple
 from pydantic.fields import FieldInfo as PydanticFieldInfo
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 from .config import (
     DEFAULT_FIELD_TYPE_MAPPING,
-    DEFAULT_FIELD_TEMPLATES,
+    DEFAULT_FIELD_TEMPLATES, # Мы все еще используем это для определения пути к единому шаблону
     DEFAULT_READONLY_FIELDS_IN_EDIT,
 )
 from .utils import (
@@ -18,14 +18,13 @@ from .utils import (
     is_relation,
     get_relation_model_name,
 )
+from .types import ComponentMode, FieldState
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("core_sdk.frontend.field")
 
 if TYPE_CHECKING:
-    from .renderer import (
-        ViewRenderer,
-    )  # ViewRenderer импортируется только для type hinting
+    from .renderer import ViewRenderer
 
 
 class FieldRenderContext(BaseModel):
@@ -34,19 +33,26 @@ class FieldRenderContext(BaseModel):
     label: str
     description: Optional[str] = None
     field_type: str
-    template_path: str
-    mode: str
-    is_readonly: bool = False
-    is_required: bool = False
-    options: Optional[List[Tuple[Any, str]]] = None
-    errors: Optional[List[str]] = None
+    template_path: str # Путь к единому шаблону поля (например, fields/text_field.html)
+    state: FieldState
     html_id: str
     html_name: str
-    extra: Dict[str, Any] = {}
-    parent_context: Optional[Dict[str, Any]] = (
-        None  # Контекст родительского ViewRenderer
-    )
+    is_readonly: bool = False
+    is_required: bool = False
+    errors: Optional[List[str]] = None
+    options: Optional[List[Tuple[Any, str]]] = None
+    related_model_name: Optional[str] = None
+    extra_attrs: Dict[str, Any] = {}
+    is_editable_context: bool = False # НОВЫЙ ФЛАГ
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+# core_sdk/frontend/field.py
+# ... (импорты FieldState, ComponentMode, FieldRenderContext как были) ...
+
+if TYPE_CHECKING:
+    from .renderer import RenderContext # Изменили импорт
 
 class SDKField:
     def __init__(
@@ -54,18 +60,25 @@ class SDKField:
         name: str,
         field_info: PydanticFieldInfo,
         value: Any,
-        parent: "ViewRenderer",
-        mode: str,
+        # --- ИЗМЕНЕНИЕ: Принимаем готовый RenderContext родителя ---
+        parent_render_context: "RenderContext",
+        # ----------------------------------------------------------
+        component_mode: ComponentMode, # Все еще нужен для определения _determined_template_path
+        field_state: FieldState,
     ):
         self.name = name
         self.field_info = field_info
         self.value = value
-        self.parent = parent  # parent это экземпляр ViewRenderer
-        self.mode = mode
+        # --- ИЗМЕНЕНИЕ ---
+        self.parent_render_context = parent_render_context
+        # -----------------
+        self.component_mode = component_mode # Для _determine_field_type_and_template
+        self.field_state = field_state
+
         self.config: Dict[str, Any] = {}
-        self._field_type: Optional[str] = None
-        self._template_path: Optional[str] = None
-        self._options: Optional[List[Tuple[Any, str]]] = None
+        self._determined_field_type: Optional[str] = None
+        self._determined_template_path: Optional[str] = None
+        self._loaded_options: Optional[List[Tuple[Any, str]]] = None
 
         self._prepare()
 
@@ -73,231 +86,145 @@ class SDKField:
         json_schema_extra_data = {}
         if self.field_info.json_schema_extra:
             if callable(self.field_info.json_schema_extra):
-                try:
-                    json_schema_extra_data = self.field_info.json_schema_extra()
-                except Exception:
-                    pass
+                try: json_schema_extra_data = self.field_info.json_schema_extra()
+                except Exception: pass
             elif isinstance(self.field_info.json_schema_extra, dict):
-                json_schema_extra_data = self.field_info.json_schema_extra
+                json_schema_extra_data = self.field_info.json_schema_extra.copy()
 
-        # self.parent.html_id - это ID основного элемента, рендеримого ViewRenderer
-        # (например, формы <form id="sdk-user-new-create-uuid">)
-        # или таблицы <div id="sdk-user-list-list-uuid" class="card">
-        # или фильтра <form id="sdk-user-filter-filter_form-uuid">
-
-        # Для полей внутри формы, ID поля должен быть уникальным в пределах этой формы.
-        # Имя поля для HTML формы теперь будет просто именем поля модели/схемы.
-        field_html_id = f"{self.parent.html_id}__{self.name}"
-        field_html_name = self.name  # <--- ИЗМЕНЕНИЕ: html_name теперь просто self.name
+        # Используем html_id родительского компонента из parent_render_context
+        field_html_id = f"{self.parent_render_context.html_id}__{self.name}"
+        field_html_name = self.name
+        ui_config = json_schema_extra_data.pop('ui_config', {})
 
         self.config = {
             "label": self.field_info.title or self.name.replace("_", " ").capitalize(),
             "description": self.field_info.description,
-            "is_required": self.field_info.is_required()
-            and self.mode
-            in [
-                "edit",
-                "create",
-                "filter_form",
-            ],  # filter_form тоже может иметь required
-            "is_readonly": False,
+            "is_required": self.field_info.is_required() and self.field_state == FieldState.EDIT,
+            "is_readonly": False, # Определится ниже
             "html_id": field_html_id,
-            "html_name": field_html_name,  # <--- ИСПОЛЬЗУЕМ ОБНОВЛЕННОЕ ЗНАЧЕНИЕ
-            "extra_json": json_schema_extra_data,
+            "html_name": field_html_name,
+            "extra_attrs": ui_config,
+            "related_model_name": json_schema_extra_data.get("rel"),
         }
-        self.config["is_readonly"] = self.config["extra_json"].get("readonly", False)
-        if self.mode == "edit" and self.name in DEFAULT_READONLY_FIELDS_IN_EDIT:
-            self.config["is_readonly"] = True
+
+        is_readonly_from_schema = json_schema_extra_data.get("readonly", False)
+        is_default_readonly_in_edit = (
+            self.field_state == FieldState.EDIT and self.name in DEFAULT_READONLY_FIELDS_IN_EDIT
+        )
+        self.config["is_readonly"] = (self.field_state == FieldState.VIEW) or is_readonly_from_schema or is_default_readonly_in_edit
+
+        if self.config["is_readonly"] and self.field_state == FieldState.EDIT:
+            self.config["is_required"] = False
 
     def _prepare(self):
         self._extract_config()
-        self._determine_field_type_and_template()
+        self._determine_field_type_and_template() # component_mode используется здесь
 
     def _determine_field_type_and_template(self):
-        # ... (код этого метода остается таким же, как в предыдущем вашем ответе, где он был исправлен)
+        # ... (логика определения self._determined_field_type как была)
         annotation = self.field_info.annotation
         base_type = get_base_type(annotation)
         type_name_for_mapping = getattr(base_type, "__name__", str(base_type))
-        field_render_type = "default"
-        related_model_for_id_resolution = self.config["extra_json"].get("rel")
-        explicit_render_type = self.config["extra_json"].get("render_type")
-
-        logger.debug(
-            f"Determining field type for '{self.name}': Annotation='{annotation}', BaseType='{base_type}', "
-            f"Rel='{related_model_for_id_resolution}', ExplicitRenderType='{explicit_render_type}'"
-        )
+        related_model_name = self.config.get("related_model_name")
+        explicit_render_type = self.config["extra_attrs"].get("render_type")
+        determined_field_type = "default"
 
         if explicit_render_type:
-            field_render_type = explicit_render_type
-            logger.debug(f"  Using explicit render_type: '{field_render_type}'")
-            if field_render_type in [
-                "relation",
-                "list_relation",
-                "uuid_with_title_resolution",
-                "list_uuid_with_title_resolution",
-            ]:
-                self.config["relation_model_name"] = (
-                    related_model_for_id_resolution
-                    or get_relation_model_name(annotation)
-                )
-                logger.debug(
-                    f"    relation_model_name set to: '{self.config.get('relation_model_name')}'"
-                )
-        elif base_type is bool:
-            field_render_type = "switch"
-            logger.debug("  Type set to 'switch' for bool type")
-        elif related_model_for_id_resolution:
-            if base_type is uuid.UUID or type_name_for_mapping == "UUID":
-                field_render_type = "relation"
-                self.config["relation_model_name"] = (
-                    related_model_for_id_resolution.lower()
-                )
-                logger.debug(
-                    f"  Type set to 'uuid_with_title_resolution' for model '{related_model_for_id_resolution}'"
-                )
+            determined_field_type = explicit_render_type
+            if determined_field_type in ["relation", "list_relation"] and not related_model_name:
+                self.config["related_model_name"] = get_relation_model_name(annotation)
+        elif base_type is bool: determined_field_type = "switch"
+        elif related_model_name:
+            if base_type is uuid.UUID or type_name_for_mapping == "UUID": determined_field_type = "relation"
             elif is_list_type(annotation):
                 list_item_b_type = get_list_item_type(annotation)
-                if (
-                    list_item_b_type is uuid.UUID
-                    or getattr(list_item_b_type, "__name__", "") == "UUID"
-                ) and self.name not in ["id", "id__in"]:
-                    field_render_type = "list_relation"
-                    self.config["relation_model_name"] = (
-                        related_model_for_id_resolution.lower()
-                    )
-                    logger.debug(
-                        f"  Type set to 'list_uuid_with_title_resolution' for model '{related_model_for_id_resolution}'"
-                    )
-                else:
-                    logger.warning(
-                        f"  Field '{self.name}' has 'rel' but is a list of non-UUIDs ('{list_item_b_type}'). Treating as 'list_simple'."
-                    )
-                    field_render_type = "list_simple"
-            else:
-                logger.warning(
-                    f"  Field '{self.name}' has 'rel' but is not UUID or List[UUID] (type: '{base_type}'). Defaulting type."
-                )
-                # Позволит следующей логике определить тип
-                pass
-
-        if field_render_type == "default":
+                if list_item_b_type is uuid.UUID or getattr(list_item_b_type, "__name__", "") == "UUID":
+                    if self.name not in ["id", "id__in"]: determined_field_type = "list_relation"
+                    else: determined_field_type = "list_simple"
+                else: determined_field_type = "list_simple"
+        if determined_field_type == "default":
             if is_relation(annotation):
-                field_render_type = "relation"
-                self.config["relation_model_name"] = get_relation_model_name(annotation)
-                logger.debug(
-                    f"  Type set to 'relation' for model '{self.config.get('relation_model_name')}'"
-                )
-            elif is_list_type(annotation):
-                list_item_b_type = get_list_item_type(annotation)
-                if is_relation(list_item_b_type):
-                    field_render_type = "list_relation"
-                    self.config["relation_model_name"] = get_relation_model_name(
-                        list_item_b_type
-                    )
-                    logger.debug(
-                        f"  Type set to 'list_relation' for model '{self.config.get('relation_model_name')}'"
-                    )
-                else:
-                    field_render_type = "list_simple"
-                    logger.debug(
-                        f"  Type set to 'list_simple' (list of '{list_item_b_type}')"
-                    )
-            elif inspect.isclass(base_type) and issubclass(base_type, Enum):
-                field_render_type = "select"
-                logger.debug(f"  Type set to 'select' for Enum '{base_type.__name__}'")
+                if is_list_type(annotation): determined_field_type = "list_relation"
+                else: determined_field_type = "relation"
+                self.config["related_model_name"] = get_relation_model_name(annotation)
+            elif is_list_type(annotation): determined_field_type = "list_simple"
+            elif inspect.isclass(base_type) and issubclass(base_type, Enum): determined_field_type = "select"
             else:
-                field_render_type = DEFAULT_FIELD_TYPE_MAPPING.get(
-                    type_name_for_mapping,
-                    DEFAULT_FIELD_TYPE_MAPPING.get(base_type, "text"),
-                )
-                logger.debug(
-                    f"  Type set from DEFAULT_FIELD_TYPE_MAPPING: '{field_render_type}' for base_type '{type_name_for_mapping}'"
-                )
+                determined_field_type = DEFAULT_FIELD_TYPE_MAPPING.get(type_name_for_mapping, DEFAULT_FIELD_TYPE_MAPPING.get(base_type, "text"))
+        if determined_field_type == "default": determined_field_type = "text"
+        self._determined_field_type = determined_field_type
+        # ... (конец определения self._determined_field_type)
 
-        if field_render_type == "default":
-            field_render_type = "text"
-            logger.debug("  Final fallback type set to 'text'")
+        template_path_for_type = DEFAULT_FIELD_TEMPLATES.get(self._determined_field_type, DEFAULT_FIELD_TEMPLATES["default"])
+        if not template_path_for_type or not isinstance(template_path_for_type, str):
+            logger.error(f"Invalid template path for field_type '{self._determined_field_type}'. Defaulting.")
+            self._determined_template_path = DEFAULT_FIELD_TEMPLATES["default"]
+        else:
+            self._determined_template_path = template_path_for_type
 
-        self._field_type = field_render_type
-        template_config = DEFAULT_FIELD_TEMPLATES.get(
-            self._field_type, DEFAULT_FIELD_TEMPLATES["default"]
-        )
-        self._template_path = template_config.get(
-            self.mode.value, template_config.get("view")
-        )  # Используем self.mode.value
-
+        # Логирование без f-строки со сложными объектами
         logger.info(
-            f"Field '{self.name}': Determined field_type='{self._field_type}', template_path='{self._template_path}' for mode='{self.mode.value}'"
+            "Field '%s': Determined field_type='%s', template_path='%s' (state='%s', component_mode_of_parent='%s')",
+            str(self.name), str(self._determined_field_type), str(self._determined_template_path),
+            str(self.field_state.value), str(self.component_mode.value) # component_mode здесь - это режим родителя
         )
 
-        if self._field_type in [
-            "uuid_with_title_resolution",
-            "list_uuid_with_title_resolution",
-        ] and not self.config.get("relation_model_name"):
-            logger.warning(
-                f"Field '{self.name}' is of type '{self._field_type}' but 'relation_model_name' "
-                f"(expected from json_schema_extra['rel']) is missing. Title resolution might not work."
-            )
 
     async def _load_options(self):
-        # ... (код этого метода остается таким же) ...
-        if (
-            self._field_type == "select"
-            and inspect.isclass(get_base_type(self.field_info.annotation))
-            and issubclass(get_base_type(self.field_info.annotation), Enum)
-        ):
-            enum_cls = get_base_type(self.field_info.annotation)
-            self._options = [(member.value, member.name) for member in enum_cls]
-        elif self._field_type in [
-            "relation",
-            "list_relation",
-            "uuid_with_title_resolution",
-            "list_uuid_with_title_resolution",
-        ]:
-            pass
-            # relation_model_name = self.config.get("relation_model_name")
-            # if relation_model_name:
-            #     try:
-            #         manager = self.parent.dam_factory.get_manager(relation_model_name)
-            #         results_dict = await manager.list(limit=1000)
-            #         items = results_dict.get("items", [])
-            #         self._options = []
-            #         for item in items:
-            #             item_id = getattr(item, 'id', None)
-            #             label = getattr(item, 'title', None) or \
-            #                     getattr(item, 'name', None) or \
-            #                     getattr(item, 'email', None) or \
-            #                     str(item_id)
-            #             if item_id:
-            #                 self._options.append((str(item_id), label))
-            #     except Exception as e:
-            #         logger.error(f"Failed to load options for relation field '{self.name}' (model: {relation_model_name}): {e}", exc_info=True)
-            #         self._options = []
+        # ... (логика _load_options как была, но self.parent_renderer.dam_factory заменяется на прямой доступ к DAM)
+        # Это изменение требует, чтобы SDKField имел доступ к DAM factory,
+        # что можно передать через parent_render_context.extra или напрямую в конструктор SDKField.
+        # Пока оставим как было, предполагая, что dam_factory доступен через self.parent_render_context.dam_factory (если мы его туда добавим)
+        # или что ViewRenderer передаст его в SDKField.
+        # Для упрощения, ViewRenderer должен будет передать dam_factory в SDKField.
+        # Либо, SDKField._load_options должен быть вызван из ViewRenderer, который имеет доступ к dam_factory.
+        # Давайте пока оставим вызов self.parent_renderer.dam_factory, но это нужно будет исправить.
+        # ЛУЧШЕ: ViewRenderer будет вызывать _load_options для SDKField, если это нужно.
+        # Тогда SDKField не нужен прямой доступ к dam_factory.
+        # В get_render_context мы просто будем использовать self._loaded_options.
+        pass # Загрузка опций будет управляться ViewRenderer
+
 
     async def get_render_context(self) -> FieldRenderContext:
-        if self._options is None and self._field_type in [
-            "select",
-            "relation",
-            "list_relation",
-            "uuid_with_title_resolution",
-            "list_uuid_with_title_resolution",
-        ]:
-            await self._load_options()
+        # self._loaded_options теперь должен быть установлен ViewRenderer перед вызовом этого метода, если они нужны
+        # (т.е. если field_state == EDIT и тип поля требует опций)
+
+        # is_readonly текущего состояния поля
+        is_readonly_for_current_state = self.config["is_readonly"]
+
+        # Определяем, можно ли в принципе кликнуть по этому полю для перехода в режим EDIT
+        # (если оно сейчас в состоянии VIEW)
+        parent_allows_overall_edit = self.parent_render_context.can_edit
+        field_is_schematically_editable = not (
+            self.config["extra_attrs"].get("readonly", False) or \
+            (self.name in DEFAULT_READONLY_FIELDS_IN_EDIT)
+        )
+
+        # Для ячеек таблицы, редактируемость определяется 'editable_in_table'
+        if self.parent_render_context.component_mode == ComponentMode.TABLE_CELL:
+            contextual_edit_permission = self.config["extra_attrs"].get('editable_in_table', self.config["extra_attrs"].get('editable', True))
+        else: # Для форм (VIEW_FORM, EDIT_FORM, CREATE_FORM)
+            contextual_edit_permission = parent_allows_overall_edit
+
+        # Поле можно перевести в режим редактирования, если оно не readonly по схеме
+        # И если контекст компонента это позволяет
+        is_editable_in_this_context = field_is_schematically_editable and contextual_edit_permission
 
         return FieldRenderContext(
             name=self.name,
             value=self.value,
             label=self.config["label"],
             description=self.config["description"],
-            field_type=self._field_type,
-            template_path=self._template_path,
-            mode=self.mode.value,  # Передаем строковое значение RenderMode
-            is_readonly=self.config["is_readonly"],
+            field_type=self._determined_field_type,
+            template_path=self._determined_template_path,
+            state=self.field_state,
+            is_readonly=is_readonly_for_current_state, # Это is_readonly для текущего field_state
             is_required=self.config["is_required"],
-            options=self._options,
-            errors=None,
+            errors=None, # Ошибки будут добавлены в ViewRenderer
+            options=self._loaded_options, # Заполняется ViewRenderer
+            related_model_name=self.config.get("related_model_name"),
             html_id=self.config["html_id"],
             html_name=self.config["html_name"],
-            extra=self.config,
-            parent_context=self.parent.get_base_context(),
+            extra_attrs=self.config["extra_attrs"],
+            is_editable_context=is_editable_in_this_context,
         )

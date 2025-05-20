@@ -1,0 +1,7 @@
+{# core_sdk/frontend/templates/components/_field_errors.html #}
+{# Ожидает: field_ctx (FieldRenderContext) #}
+{% if field_ctx.errors %}
+    <div class="invalid-feedback d-block" id="{{ field_ctx.html_id }}_errors">
+        {{ field_ctx.errors | join('<br>') | safe }}
+    </div>
+{% endif %}

@@ -1,29 +1,28 @@
 {# core_sdk/frontend/templates/components/_confirm_delete_modal.html #}
-{# Ожидает: request, ctx (RenderContext с item_id, model_name), url_for #}
-{% set modal_id = "confirm-delete-" ~ ctx.model_name ~ "-" ~ ctx.item_id %}
+{# Ожидает: ctx (RenderContext с component_mode=DELETE_CONFIRM, item_id, model_name), url_for #}
 
-{% block modal_size %}modal-md{% endblock %}
+{# Этот шаблон теперь будет загружаться в _modal_wrapper через content_url #}
+{# Поэтому ему не нужен extends и блоки modal_size, modal_title, modal_body, modal_footer #}
+{# Он должен предоставить только содержимое для .modal-body и, возможно, кастомный .modal-footer #}
 
-{% block modal_title %}Подтверждение удаления{% endblock %}
+<p>Вы уверены, что хотите удалить <strong>{{ ctx.model_name }}</strong> (ID: {{ ctx.item_id }})?</p>
+<p class="text-danger fw-semibold">Это действие необратимо.</p>
 
-{% block modal_body %}
-    <p>Вы уверены, что хотите удалить <strong>{{ ctx.model_name }}</strong> (ID: {{ ctx.item_id }})?</p>
-    <p class="text-danger fw-semibold">Это действие необратимо.</p>
-{% endblock %}
-
-{% block modal_footer %}
-<div class="modal-footer">
+{# Кастомный футер для этой модалки, если он нужен внутри hx-get контента #}
+{# Если _modal_wrapper предоставляет общий футер, этот блок можно убрать #}
+{# или оставить пустым, если кнопки из _modal_wrapper подходят. #}
+{# В нашем случае, _modal_wrapper.html теперь имеет пустой футер, #}
+{# так как form.html и view.html предоставляют свои. #}
+{# Для модалки подтверждения удаления кнопки нужны. #}
+<div class="modal-footer sdk-override-footer"> {# Добавим класс, чтобы JS мог его найти и переместить, если нужно #}
     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
     <button type="button" class="btn btn-danger"
-            id="confirm-delete-btn-{{ ctx.item_id }}" {# Добавим ID для отладки, если понадобится #}
+            id="confirm-delete-btn-{{ ctx.item_id }}"
             hx-delete="{{ url_for('delete_item', model_name=ctx.model_name, item_id=ctx.item_id) }}"
-            {# Цель - строка таблицы или блок просмотра. Ищем ближайший элемент с атрибутом ui_key #}
-            {# Если элемент не найден, HTMX ничего не сделает с DOM, но запрос уйдет #}
             hx-target="closest [ui_key='{{ ctx.model_name }}--{{ ctx.item_id }}']"
-            hx-swap="outerHTML swap:1s" {# Удаляем элемент после успешного ответа 2xx с задержкой #}
-            {# Убираем onclick, будем закрывать модалку через HX-Trigger в ответе от delete_item #}
+            hx-swap="outerHTML swap:0.5s" {# Уменьшил задержку #}
+            {# HX-Trigger для закрытия модалки и обновления данных будет в ответе от delete_item #}
             >
         Удалить
     </button>
 </div>
-{% endblock %}

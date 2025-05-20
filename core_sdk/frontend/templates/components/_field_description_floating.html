@@ -1,0 +1,11 @@
+{# core_sdk/frontend/templates/components/_field_description_floating.html #}
+{# Ожидает: field_ctx (FieldRenderContext), component_ctx (RenderContext для modal_container_id) #}
+{% if field_ctx.description %}
+    <span class="form-floating-info-icon"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          data-bs-container="#{{ field_ctx.html_id }}-instance"
+          title="{{ field_ctx.description | escape }}">
+        <i class="ti ti-info-circle text-muted"></i>
+    </span>
+{% endif %}
